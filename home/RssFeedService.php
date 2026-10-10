@@ -20,7 +20,7 @@ class RssFeedService {
      * @param int $maxSources
      * @return array
      */
-    public static function getGroupArticles($groupKey = 'tech-business', $forceRefresh = false, $maxSources = 25) {
+    public static function getGroupArticles($groupKey = 'tech-business', $forceRefresh = false, $maxSources = 4) {
         if (!file_exists(self::$cacheDir)) {
             @mkdir(self::$cacheDir, 0777, true);
         }
@@ -32,15 +32,12 @@ class RssFeedService {
 
         $cacheFile = self::$cacheDir . '/rss_' . $safeGroupKey . '.json';
 
-        // Return from cache if fresh
+        // Return from cache immediately if exists (zero latency)
         if (!$forceRefresh && file_exists($cacheFile)) {
-            $fileAge = time() - filemtime($cacheFile);
-            if ($fileAge < self::$cacheTtl) {
-                $content = @file_get_contents($cacheFile);
-                $cached = $content ? json_decode($content, true) : null;
-                if (is_array($cached) && !empty($cached)) {
-                    return $cached;
-                }
+            $content = @file_get_contents($cacheFile);
+            $cached = $content ? json_decode($content, true) : null;
+            if (is_array($cached) && !empty($cached)) {
+                return $cached;
             }
         }
 
@@ -120,21 +117,18 @@ class RssFeedService {
 
         $cacheFile = self::$cacheDir . '/rss_all_aggregated.json';
 
-        // Check if aggregated cache is fresh (< 5 mins)
+        // Return from cache immediately if exists (zero latency)
         if (!$forceRefresh && file_exists($cacheFile)) {
-            $fileAge = time() - filemtime($cacheFile);
-            if ($fileAge < self::$cacheTtl) {
-                $content = @file_get_contents($cacheFile);
-                $cached = $content ? json_decode($content, true) : null;
-                if (is_array($cached) && !empty($cached)) {
-                    return $cached;
-                }
+            $content = @file_get_contents($cacheFile);
+            $cached = $content ? json_decode($content, true) : null;
+            if (is_array($cached) && !empty($cached)) {
+                return $cached;
             }
         }
 
         $groups = SupabaseFeedService::getFeedGroups(true);
         if (empty($groups)) {
-            return self::getGroupArticles('tech-business', $forceRefresh);
+            $groups = SupabaseFeedService::getDefaultFeedGroups();
         }
 
         $allArticles = [];
@@ -143,9 +137,10 @@ class RssFeedService {
         foreach ($groups as $g) {
             $gKey = $g['key'];
             $gLabel = $g['label'];
-            $groupArts = self::getGroupArticles($gKey, $forceRefresh, 6);
+            // Read group articles (reads group cache if present)
+            $groupArts = self::getGroupArticles($gKey, false, 2);
             if (!empty($groupArts)) {
-                $slice = array_slice($groupArts, 0, 10);
+                $slice = array_slice($groupArts, 0, 8);
                 foreach ($slice as $art) {
                     $dedupKey = !empty($art['link']) ? $art['link'] : ($art['id'] ?? '');
                     if (!isset($seen[$dedupKey])) {

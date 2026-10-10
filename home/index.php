@@ -51,11 +51,23 @@ if ($isAllCategories) {
     $articlesByGroup = [];
     foreach ($groups as $g) {
         $gKey = $g['key'];
-        $gArticles = RssFeedService::getGroupArticles($gKey, false);
-        if (!empty($gArticles)) {
+        // Fast in-memory matching from $articles
+        $matched = [];
+        foreach ($articles as $art) {
+            if (($art['group_key'] ?? '') === $gKey) {
+                $matched[] = $art;
+                if (count($matched) >= 4) break;
+            }
+        }
+        // If not in aggregated list, check group cache
+        if (empty($matched)) {
+            $gArticles = RssFeedService::getGroupArticles($gKey, false, 2);
+            $matched = array_slice($gArticles, 0, 4);
+        }
+        if (!empty($matched)) {
             $articlesByGroup[$gKey] = [
                 'group'    => $g,
-                'articles' => array_slice($gArticles, 0, 4)
+                'articles' => $matched
             ];
         }
     }

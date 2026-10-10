@@ -80,7 +80,6 @@ uploads/images/*
 uploads/translates/*
 config/config.php
 .DS_Store
-home/cache/rss_*.json
 logs/*.log
 home/config.local.php
 contact/config.local.php

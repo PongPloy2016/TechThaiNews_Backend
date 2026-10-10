@@ -37,8 +37,10 @@ class SupabaseFeedService {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonPayload);
             }
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 3);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
 
             $raw = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -138,9 +140,30 @@ class SupabaseFeedService {
                 }
                 $items[] = $group;
             }
-            return $items;
+            if (!empty($items)) {
+                return $items;
+            }
         }
-        return [];
+        return self::getDefaultFeedGroups($onlyActive);
+    }
+
+    /**
+     * Built-in default feed groups for zero-latency fallback and offline resiliency
+     */
+    public static function getDefaultFeedGroups($onlyActive = false) {
+        $defaults = [
+            ['id' => 'grp-1', 'key' => 'tech-business', 'label' => 'ข่าวเทคโนโลยีและธุรกิจดิจิทัล', 'color' => '#0ea5e9', 'is_active' => true, 'order_index' => 1],
+            ['id' => 'grp-2', 'key' => 'international', 'label' => 'ข่าวไอทีต่างประเทศ', 'color' => '#06b6d4', 'is_active' => true, 'order_index' => 2],
+            ['id' => 'grp-3', 'key' => 'thai-news', 'label' => 'ข่าวสำนักข่าวไทย', 'color' => '#ef4444', 'is_active' => true, 'order_index' => 3],
+            ['id' => 'grp-4', 'key' => 'mobile', 'label' => 'ข่าวมือถือและอุปกรณ์', 'color' => '#f43f5e', 'is_active' => true, 'order_index' => 4],
+            ['id' => 'grp-5', 'key' => 'computer-games', 'label' => 'ข่าวคอมพิวเตอร์และเกม', 'color' => '#10b981', 'is_active' => true, 'order_index' => 5],
+            ['id' => 'grp-6', 'key' => 'ai-innovation', 'label' => 'ปัญญาประดิษฐ์และ AI', 'color' => '#8b5cf6', 'is_active' => true, 'order_index' => 6],
+            ['id' => 'grp-7', 'key' => 'weather-forecast', 'label' => 'สภาพอากาศและฟ้าฝน', 'color' => '#3b82f6', 'is_active' => true, 'order_index' => 7],
+            ['id' => 'grp-8', 'key' => 'cybersecurity', 'label' => 'ความปลอดภัยไซเบอร์และเตือนภัย', 'color' => '#f59e0b', 'is_active' => true, 'order_index' => 8],
+            ['id' => 'grp-9', 'key' => 'agriculture', 'label' => 'ข่าวเกษตร', 'color' => '#84cc16', 'is_active' => true, 'order_index' => 9],
+            ['id' => 'grp-10', 'key' => 'travel-tourism', 'label' => 'ข่าวท่องเที่ยว', 'color' => '#ec4899', 'is_active' => true, 'order_index' => 10],
+        ];
+        return $defaults;
     }
 
     /**
@@ -286,10 +309,34 @@ class SupabaseFeedService {
             $endpoint .= '&is_active=eq.true';
         }
         $res = self::request($endpoint, 'GET');
-        if ($res['code'] >= 200 && $res['code'] < 300 && is_array($res['data'])) {
+        if ($res['code'] >= 200 && $res['code'] < 300 && is_array($res['data']) && !empty($res['data'])) {
             return $res['data'];
         }
-        return [];
+        return self::getDefaultFeedSources($groupKey);
+    }
+
+    /**
+     * Built-in default feed sources for instant fallback
+     */
+    public static function getDefaultFeedSources($groupKey = null) {
+        $sources = [
+            ['id' => 'src-1', 'key' => 'blognone', 'label' => 'Blognone', 'url' => 'https://www.blognone.com/atom.xml', 'group_key' => 'tech-business', 'is_active' => true],
+            ['id' => 'src-2', 'key' => 'droidsans', 'label' => 'Droidsans', 'url' => 'https://droidsans.com/feed/', 'group_key' => 'mobile', 'is_active' => true],
+            ['id' => 'src-3', 'key' => 'thairath-tech', 'label' => 'ไทยรัฐ ไอที', 'url' => 'https://www.thairath.co.th/rss/news/tech', 'group_key' => 'tech-business', 'is_active' => true],
+            ['id' => 'src-4', 'key' => 'thairath-pol', 'label' => 'ไทยรัฐ การเมือง', 'url' => 'https://www.thairath.co.th/rss/news/politic', 'group_key' => 'thai-news', 'is_active' => true],
+            ['id' => 'src-5', 'key' => 'beartai', 'label' => 'แบไต๋', 'url' => 'https://www.beartai.com/feed', 'group_key' => 'tech-business', 'is_active' => true],
+            ['id' => 'src-6', 'key' => 'techsauce', 'label' => 'Techsauce', 'url' => 'https://techsauce.co/feed', 'group_key' => 'tech-business', 'is_active' => true],
+            ['id' => 'src-7', 'key' => 'sanook-hitech', 'label' => 'Sanook Hitech', 'url' => 'https://rssfeeds.sanook.com/rss/feeds/sanook.hitech.xml', 'group_key' => 'mobile', 'is_active' => true],
+            ['id' => 'src-8', 'key' => 'tmd-weather', 'label' => 'กรมอุตุนิยมวิทยา', 'url' => 'https://www.tmd.go.th/feed.php', 'group_key' => 'weather-forecast', 'is_active' => true],
+            ['id' => 'src-9', 'key' => 'the-verge', 'label' => 'The Verge', 'url' => 'https://www.theverge.com/rss/index.xml', 'group_key' => 'international', 'is_active' => true],
+            ['id' => 'src-10', 'key' => 'wired-ai', 'label' => 'Wired AI', 'url' => 'https://www.wired.com/feed/tag/ai/latest/rss', 'group_key' => 'ai-innovation', 'is_active' => true],
+        ];
+        if (!empty($groupKey) && $groupKey !== 'all') {
+            return array_values(array_filter($sources, function($s) use ($groupKey) {
+                return ($s['group_key'] ?? '') === $groupKey;
+            }));
+        }
+        return $sources;
     }
 
     /**
