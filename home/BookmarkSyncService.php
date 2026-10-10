@@ -422,21 +422,88 @@ class BookmarkSyncService {
     }
 
     /**
-     * Get list of bookmarks with filtering (Supports both Local MySQL and Cloud Direct)
+     * Get total count of bookmarks matching filter criteria
+     *
+     * @param string|null $category
+     * @param string|null $syncStatus
+     * @param string|null $search
+     * @return int
+     */
+    public static function getBookmarksCount(?string $category = null, ?string $syncStatus = null, ?string $search = null): int {
+        self::ensureTableExists();
+        $db = self::getDb();
+
+        if (!$db) {
+            $cloudList = SupabaseFeedService::getUserBookmarks(500, $category);
+            $count = 0;
+            foreach ($cloudList as $cb) {
+                if (!empty($syncStatus) && $syncStatus !== 'all' && $syncStatus !== 'synced') {
+                    continue;
+                }
+                if (!empty($search)) {
+                    $q = mb_strtolower($search);
+                    $titleMatch = mb_strpos(mb_strtolower($cb['title'] ?? ''), $q) !== false;
+                    $sourceMatch = mb_strpos(mb_strtolower($cb['source'] ?? ''), $q) !== false;
+                    $deviceMatch = mb_strpos(mb_strtolower($cb['device_id'] ?? ''), $q) !== false;
+                    if (!$titleMatch && !$sourceMatch && !$deviceMatch) {
+                        continue;
+                    }
+                }
+                $count++;
+            }
+            return $count;
+        }
+
+        try {
+            $where = [];
+            $params = [];
+
+            if (!empty($category) && $category !== 'all') {
+                $where[] = "`category` = :cat";
+                $params[':cat'] = $category;
+            }
+
+            if (!empty($syncStatus) && $syncStatus !== 'all') {
+                $where[] = "`sync_status` = :status";
+                $params[':status'] = $syncStatus;
+            }
+
+            if (!empty($search)) {
+                $where[] = "(`title` LIKE :q1 OR `source` LIKE :q2 OR `device_id` LIKE :q3)";
+                $params[':q1'] = '%' . $search . '%';
+                $params[':q2'] = '%' . $search . '%';
+                $params[':q3'] = '%' . $search . '%';
+            }
+
+            $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+            $sql = "SELECT COUNT(*) FROM `bookmarks` {$whereSql}";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            return (int)$stmt->fetchColumn();
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService getBookmarksCount error: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Get list of bookmarks with filtering and pagination (Supports both Local MySQL and Cloud Direct)
      *
      * @param int $limit
+     * @param int $offset
      * @param string|null $category
      * @param string|null $syncStatus
      * @param string|null $search
      * @return array
      */
-    public static function getLocalBookmarks(int $limit = 200, ?string $category = null, ?string $syncStatus = null, ?string $search = null): array {
+    public static function getLocalBookmarks(int $limit = 10, int $offset = 0, ?string $category = null, ?string $syncStatus = null, ?string $search = null): array {
         self::ensureTableExists();
         $db = self::getDb();
 
         if (!$db) {
             // Cloud Direct fallback
-            $cloudList = SupabaseFeedService::getUserBookmarks($limit, $category);
+            $cloudList = SupabaseFeedService::getUserBookmarks(500, $category);
             $items = [];
             $idx = 1;
             foreach ($cloudList as $cb) {
@@ -476,7 +543,7 @@ class BookmarkSyncService {
                     'updated_at'       => $cb['updated_at'] ?? date('Y-m-d H:i:s'),
                 ];
             }
-            return $items;
+            return array_slice($items, $offset, $limit);
         }
 
         try {
@@ -494,12 +561,14 @@ class BookmarkSyncService {
             }
 
             if (!empty($search)) {
-                $where[] = "(`title` LIKE :q OR `source` LIKE :q OR `device_id` LIKE :q)";
-                $params[':q'] = '%' . $search . '%';
+                $where[] = "(`title` LIKE :q1 OR `source` LIKE :q2 OR `device_id` LIKE :q3)";
+                $params[':q1'] = '%' . $search . '%';
+                $params[':q2'] = '%' . $search . '%';
+                $params[':q3'] = '%' . $search . '%';
             }
 
             $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-            $sql = "SELECT * FROM `bookmarks` {$whereSql} ORDER BY `created_at` DESC LIMIT " . (int)$limit;
+            $sql = "SELECT * FROM `bookmarks` {$whereSql} ORDER BY `created_at` DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
             $stmt = $db->prepare($sql);
             $stmt->execute($params);
@@ -507,7 +576,7 @@ class BookmarkSyncService {
         } catch (\Throwable $e) {
             error_log("BookmarkSyncService getLocalBookmarks query error: " . $e->getMessage());
             // Fallback to Supabase Cloud Direct if query fails
-            $cloudList = SupabaseFeedService::getUserBookmarks($limit, $category);
+            $cloudList = SupabaseFeedService::getUserBookmarks(500, $category);
             $items = [];
             $idx = 1;
             foreach ($cloudList as $cb) {
@@ -534,7 +603,7 @@ class BookmarkSyncService {
                     'updated_at'       => $cb['updated_at'] ?? date('Y-m-d H:i:s'),
                 ];
             }
-            return $items;
+            return array_slice($items, $offset, $limit);
         }
     }
 

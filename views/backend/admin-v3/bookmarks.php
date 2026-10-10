@@ -8,21 +8,41 @@ $allBookmarks = $bookmarks ?? [];
 $syncCounts   = $sync_counts ?? ['total' => count($allBookmarks), 'synced' => 0, 'pending' => 0, 'failed' => 0, 'local_only' => 0];
 $selectedCat  = $selected_category ?? 'all';
 $selectedStat = $selected_status ?? 'all';
+$searchQuery  = $search_query ?? '';
 
-$totalCount   = $syncCounts['total'] ?? count($allBookmarks);
+$currentPage  = isset($current_page) ? max(1, (int)$current_page) : 1;
+$perPage      = isset($per_page) ? (int)$per_page : 10;
+$totalItems   = isset($total_items) ? (int)$total_items : count($allBookmarks);
+$totalPages   = isset($total_pages) ? max(1, (int)$total_pages) : max(1, (int)ceil($totalItems / $perPage));
+
+$startItem    = $totalItems > 0 ? (($currentPage - 1) * $perPage) + 1 : 0;
+$endItem      = min($totalItems, $currentPage * $perPage);
+
+$totalCount   = $syncCounts['total'] ?? $totalItems;
 $syncedCount  = $syncCounts['synced'] ?? 0;
 $pendingCount = $syncCounts['pending'] ?? 0;
 $failedCount  = $syncCounts['failed'] ?? 0;
 $localCount   = $syncCounts['local_only'] ?? 0;
 
-// Category distribution
-$catCounts = [];
-foreach ($allBookmarks as $bm) {
-    $c = !empty($bm['category']) ? $bm['category'] : 'ทั่วไป';
-    $catCounts[$c] = ($catCounts[$c] ?? 0) + 1;
-}
-arsort($catCounts);
+// Helper to construct pagination URLs while preserving current filters & search
+$buildPageUrl = function($pageNum) use ($selectedCat, $selectedStat, $searchQuery) {
+    $params = [];
+    if ($pageNum > 1) {
+        $params['page'] = $pageNum;
+    }
+    if (!empty($selectedCat) && $selectedCat !== 'all') {
+        $params['category'] = $selectedCat;
+    }
+    if (!empty($selectedStat) && $selectedStat !== 'all') {
+        $params['sync_status'] = $selectedStat;
+    }
+    if (!empty($searchQuery)) {
+        $params['q'] = $searchQuery;
+    }
+    return admin_url("bookmarks" . (!empty($params) ? '?' . http_build_query($params) : ''));
+};
 ?>
+
 
 <style>
 /* Modern Bookmarks Dual-Sync Hub Styles */
@@ -378,6 +398,124 @@ arsort($catCounts);
     color: #ffffff;
     border-color: #4338ca;
 }
+
+/* 📄 Pagination Bar & Next Page Controls */
+.bm-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    background: #f8fafc;
+    border-top: 1px solid var(--bm-border);
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.bm-pagination-info {
+    font-size: 13px;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.bm-pagination-info strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+.bm-page-tag {
+    background: #e2e8f0;
+    color: #334155;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.bm-limit-tag {
+    background: #ede9fe;
+    color: #5b21b6;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.bm-pagination-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.bm-page-item {
+    margin: 0;
+    list-style: none;
+}
+.bm-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 9px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: all 0.15s ease-in-out;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.bm-page-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #0f172a;
+    transform: translateY(-1px);
+}
+.bm-page-btn-nav {
+    padding: 0 12px;
+    font-weight: 600;
+}
+.bm-page-btn-next {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+    color: #ffffff !important;
+    border-color: #4338ca !important;
+    font-weight: 700 !important;
+    padding: 0 16px !important;
+    box-shadow: 0 3px 10px rgba(79, 70, 229, 0.3) !important;
+}
+.bm-page-btn-next:hover {
+    background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%) !important;
+    box-shadow: 0 5px 14px rgba(79, 70, 229, 0.4) !important;
+}
+.bm-page-item.active .bm-page-btn {
+    background: #4f46e5 !important;
+    color: #ffffff !important;
+    border-color: #4f46e5 !important;
+    font-weight: 800;
+    box-shadow: 0 3px 10px rgba(79, 70, 229, 0.35);
+}
+.bm-page-item.disabled .bm-page-btn {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+    pointer-events: none;
+    opacity: 0.6;
+}
+.bm-page-dots {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 36px;
+    color: #94a3b8;
+    font-weight: 700;
+}
 </style>
 
 <!-- Content Wrapper -->
@@ -499,8 +637,13 @@ arsort($catCounts);
                     <i class="mdi mdi-bookmark-check" style="color: #4338ca; font-size: 22px;"></i>
                     รายการบุ๊กมาร์กในระบบ (Bookmarks Repository)
                     <span class="badge" style="background: #e0e7ff; color: #4338ca; font-size: 12px; font-weight: 700;">
-                        แสดง <?= count($allBookmarks) ?> รายการ
+                        แสดง <?= $startItem ?> - <?= $endItem ?> จากทั้งหมด <?= number_format($totalItems) ?> รายการ (หน้า <?= $currentPage ?> / <?= $totalPages ?>)
                     </span>
+                    <?php if (!empty($searchQuery)): ?>
+                    <span class="badge" style="background: #fef3c7; color: #92400e; font-size: 11.5px; font-weight: 600;">
+                        <i class="fa fa-search"></i> ผลการค้นหา: "<?= htmlspecialchars($searchQuery) ?>"
+                    </span>
+                    <?php endif; ?>
                 </div>
                 <div style="display: flex; gap: 8px;">
                     <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=pending") ?>" class="btn btn-xs btn-warning" style="border-radius: 6px; font-weight: 700;">
@@ -520,25 +663,36 @@ arsort($catCounts);
                     <span style="font-size: 12px; font-weight: 800; color: #64748b; margin-right: 4px; display: inline-flex; align-items: center;">
                         <i class="fa fa-filter"></i> สถานะ:
                     </span>
-                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=all") ?>" class="filter-pill <?= $selectedStat === 'all' ? 'active' : '' ?>">
+                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=all" . (!empty($searchQuery) ? '&q='.urlencode($searchQuery) : '')) ?>" class="filter-pill <?= $selectedStat === 'all' ? 'active' : '' ?>">
                         ทั้งหมด (<?= $totalCount ?>)
                     </a>
-                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=synced") ?>" class="filter-pill <?= $selectedStat === 'synced' ? 'active' : '' ?>">
+                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=synced" . (!empty($searchQuery) ? '&q='.urlencode($searchQuery) : '')) ?>" class="filter-pill <?= $selectedStat === 'synced' ? 'active' : '' ?>">
                         <i class="fa fa-check" style="color: #10b981;"></i> ซิงค์แล้ว (<?= $syncedCount ?>)
                     </a>
-                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=pending") ?>" class="filter-pill <?= $selectedStat === 'pending' ? 'active' : '' ?>">
+                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=pending" . (!empty($searchQuery) ? '&q='.urlencode($searchQuery) : '')) ?>" class="filter-pill <?= $selectedStat === 'pending' ? 'active' : '' ?>">
                         <i class="fa fa-clock-o" style="color: #f59e0b;"></i> รอซิงค์ (<?= $pendingCount ?>)
                     </a>
-                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=failed") ?>" class="filter-pill <?= $selectedStat === 'failed' ? 'active' : '' ?>">
+                    <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=failed" . (!empty($searchQuery) ? '&q='.urlencode($searchQuery) : '')) ?>" class="filter-pill <?= $selectedStat === 'failed' ? 'active' : '' ?>">
                         <i class="fa fa-times" style="color: #ef4444;"></i> ผิดพลาด (<?= $failedCount ?>)
                     </a>
                 </div>
 
-                <!-- Search input -->
-                <div class="search-box-wrap">
-                    <i class="fa fa-search"></i>
-                    <input type="text" id="bmSearchInput" placeholder="ค้นหาหัวข้อข่าว, อุปกรณ์, สำนักข่าว..." onkeyup="filterBookmarksTable()">
-                </div>
+                <!-- Search form (supports instant typing filter + Enter to search all) -->
+                <form method="GET" action="<?= admin_url("bookmarks") ?>" class="search-box-wrap" id="bmSearchForm" style="margin: 0;">
+                    <?php if (!empty($selectedCat) && $selectedCat !== 'all'): ?>
+                        <input type="hidden" name="category" value="<?= htmlspecialchars($selectedCat) ?>">
+                    <?php endif; ?>
+                    <?php if (!empty($selectedStat) && $selectedStat !== 'all'): ?>
+                        <input type="hidden" name="sync_status" value="<?= htmlspecialchars($selectedStat) ?>">
+                    <?php endif; ?>
+                    <i class="fa fa-search" onclick="document.getElementById('bmSearchForm').submit();" style="cursor: pointer;" title="กดเพื่อค้นหา"></i>
+                    <input type="text" name="q" id="bmSearchInput" value="<?= htmlspecialchars($searchQuery) ?>" placeholder="ค้นหาหัวข้อข่าว, อุปกรณ์, สำนักข่าว... (กด Enter เพื่อค้นหาทุกหน้า)" onkeyup="filterBookmarksTable()">
+                    <?php if (!empty($searchQuery)): ?>
+                        <a href="<?= admin_url("bookmarks?category=".$selectedCat."&sync_status=".$selectedStat) ?>" title="ล้างคำค้นหา" style="color: #94a3b8; padding: 0 6px; font-size: 14px; text-decoration: none;">
+                            <i class="fa fa-times-circle"></i>
+                        </a>
+                    <?php endif; ?>
+                </form>
             </div>
 
             <!-- Bookmarks Table -->
@@ -652,6 +806,86 @@ arsort($catCounts);
                         </tbody>
                     </table>
                 </div>
+
+                <!-- 📄 Pagination Bar (โหลดทีละ 10 รายการ พร้อมปุ่ม Next Page) -->
+                <?php if ($totalPages > 1 || $totalItems > 0): ?>
+                <div class="bm-pagination-bar">
+                    <div class="bm-pagination-info">
+                        กำลังแสดงรายการที่ <strong><?= $startItem ?></strong> - <strong><?= $endItem ?></strong> จากทั้งหมด <strong><?= number_format($totalItems) ?></strong> รายการ
+                        <span class="bm-page-tag">หน้า <?= $currentPage ?> / <?= $totalPages ?></span>
+                        <span class="bm-limit-tag"><i class="fa fa-list-ol"></i> <?= $perPage ?> รายการ / หน้า</span>
+                    </div>
+
+                    <?php if ($totalPages > 1): ?>
+                    <ul class="bm-pagination-nav">
+                        <!-- หน้าแรก -->
+                        <li class="bm-page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                            <a href="<?= $currentPage > 1 ? $buildPageUrl(1) : 'javascript:void(0)' ?>" class="bm-page-btn" title="หน้าแรก (หน้า 1)">
+                                <i class="fa fa-angle-double-left"></i>
+                            </a>
+                        </li>
+
+                        <!-- ก่อนหน้า (Previous) -->
+                        <li class="bm-page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                            <a href="<?= $currentPage > 1 ? $buildPageUrl($currentPage - 1) : 'javascript:void(0)' ?>" class="bm-page-btn bm-page-btn-nav" title="หน้าก่อนหน้า">
+                                <i class="fa fa-angle-left"></i> ก่อนหน้า
+                            </a>
+                        </li>
+
+                        <!-- ตัวเลขหน้า (Windowed Page Numbers) -->
+                        <?php
+                        $startPage = max(1, $currentPage - 2);
+                        $endPage   = min($totalPages, $currentPage + 2);
+                        if ($currentPage <= 3) {
+                            $endPage = min($totalPages, 5);
+                        }
+                        if ($currentPage >= $totalPages - 2) {
+                            $startPage = max(1, $totalPages - 4);
+                        }
+
+                        if ($startPage > 1): ?>
+                            <li class="bm-page-item">
+                                <a href="<?= $buildPageUrl(1) ?>" class="bm-page-btn">1</a>
+                            </li>
+                            <?php if ($startPage > 2): ?>
+                                <li class="bm-page-item disabled"><span class="bm-page-dots">…</span></li>
+                            <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php for ($p = $startPage; $p <= $endPage; $p++): ?>
+                            <li class="bm-page-item <?= $p === $currentPage ? 'active' : '' ?>">
+                                <a href="<?= $p === $currentPage ? 'javascript:void(0)' : $buildPageUrl($p) ?>" class="bm-page-btn">
+                                    <?= $p ?>
+                                </a>
+                            </li>
+                        <?php endfor; ?>
+
+                        <?php if ($endPage < $totalPages): ?>
+                            <?php if ($endPage < $totalPages - 1): ?>
+                                <li class="bm-page-item disabled"><span class="bm-page-dots">…</span></li>
+                            <?php endif; ?>
+                            <li class="bm-page-item">
+                                <a href="<?= $buildPageUrl($totalPages) ?>" class="bm-page-btn"><?= $totalPages ?></a>
+                            </li>
+                        <?php endif; ?>
+
+                        <!-- ถัดไป (Next Page) -->
+                        <li class="bm-page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                            <a href="<?= $currentPage < $totalPages ? $buildPageUrl($currentPage + 1) : 'javascript:void(0)' ?>" class="bm-page-btn bm-page-btn-next" title="หน้าถัดไป">
+                                ถัดไป (Next) <i class="fa fa-angle-right"></i>
+                            </a>
+                        </li>
+
+                        <!-- หน้าสุดท้าย -->
+                        <li class="bm-page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                            <a href="<?= $currentPage < $totalPages ? $buildPageUrl($totalPages) : 'javascript:void(0)' ?>" class="bm-page-btn" title="หน้าสุดท้าย">
+                                <i class="fa fa-angle-double-right"></i>
+                            </a>
+                        </li>
+                    </ul>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
 

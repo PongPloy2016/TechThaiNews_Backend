@@ -528,6 +528,10 @@ class Admin extends ADMIN_Controller {
                 $selectedStatus   = $this->input->get('sync_status') ?: 'all';
                 $searchQuery      = $this->input->get('q') ?: null;
 
+                // Pagination settings (10 items per page)
+                $perPage          = 10;
+                $currentPage      = max(1, (int)($this->input->get('page') ?: 1));
+
                 // Check if local table has records; if 0 and MySQL is active, auto-pull from Supabase on first run
                 $syncCounts = BookmarkSyncService::getSyncCounts();
                 if ($syncCounts['total'] === 0 && empty($syncCounts['is_cloud_only'])) {
@@ -535,16 +539,38 @@ class Admin extends ADMIN_Controller {
                     $syncCounts = BookmarkSyncService::getSyncCounts();
                 }
 
-                $data['bookmarks'] = BookmarkSyncService::getLocalBookmarks(200, $selectedCategory, $selectedStatus, $searchQuery);
-                $data['sync_counts'] = $syncCounts;
+                $totalBookmarks   = BookmarkSyncService::getBookmarksCount($selectedCategory, $selectedStatus, $searchQuery);
+                $totalPages       = max(1, (int)ceil($totalBookmarks / $perPage));
+                if ($currentPage > $totalPages && $totalPages > 0) {
+                    $currentPage = $totalPages;
+                }
+                $offset = ($currentPage - 1) * $perPage;
+
+                $data['bookmarks']         = BookmarkSyncService::getLocalBookmarks($perPage, $offset, $selectedCategory, $selectedStatus, $searchQuery);
+                $data['sync_counts']       = $syncCounts;
                 $data['selected_category'] = $selectedCategory;
-                $data['selected_status'] = $selectedStatus;
+                $data['selected_status']   = $selectedStatus;
+                $data['search_query']      = $searchQuery;
+                $data['current_page']      = $currentPage;
+                $data['per_page']          = $perPage;
+                $data['total_items']       = $totalBookmarks;
+                $data['total_pages']       = $totalPages;
             }
         } catch (\Throwable $e) {
             log_message('error', 'Error in Admin bookmarks: ' . $e->getMessage());
             if (class_exists('BookmarkSyncService')) {
-                $data['bookmarks'] = BookmarkSyncService::getLocalBookmarks(200);
-                $data['sync_counts'] = BookmarkSyncService::getSyncCounts();
+                $perPage          = 10;
+                $currentPage      = max(1, (int)($this->input->get('page') ?: 1));
+                $totalBookmarks   = BookmarkSyncService::getBookmarksCount();
+                $totalPages       = max(1, (int)ceil($totalBookmarks / $perPage));
+                $offset           = ($currentPage - 1) * $perPage;
+
+                $data['bookmarks']    = BookmarkSyncService::getLocalBookmarks($perPage, $offset);
+                $data['sync_counts']  = BookmarkSyncService::getSyncCounts();
+                $data['current_page'] = $currentPage;
+                $data['per_page']     = $perPage;
+                $data['total_items']  = $totalBookmarks;
+                $data['total_pages']  = $totalPages;
             }
         }
 
