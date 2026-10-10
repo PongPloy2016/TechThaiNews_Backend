@@ -1,0 +1,399 @@
+-- ==============================================================================
+-- TechThaiNews / IT News App - Supabase Database Schema & Initial Data
+-- Run this script in your Supabase SQL Editor:
+-- https://supabase.com/dashboard/project/zpigezwdsjelwvdpyahb/sql/new
+-- ==============================================================================
+
+-- 1. Create Feed Groups Table
+CREATE TABLE IF NOT EXISTS public.feed_groups (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#2F6FED',
+    order_index INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2. Create Feed Sources Table
+CREATE TABLE IF NOT EXISTS public.feed_sources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    key TEXT UNIQUE NOT NULL,
+    label TEXT NOT NULL,
+    url TEXT NOT NULL,
+    homepage TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'rss',
+    group_key TEXT REFERENCES public.feed_groups(key) ON DELETE SET NULL,
+    order_index INTEGER NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 3. Enable Row Level Security (RLS)
+ALTER TABLE public.feed_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.feed_sources ENABLE ROW LEVEL SECURITY;
+
+-- 4. Create Public Read Policies
+DROP POLICY IF EXISTS "Public can view active feed groups" ON public.feed_groups;
+CREATE POLICY "Public can view active feed groups"
+    ON public.feed_groups FOR SELECT
+    USING (true);
+
+DROP POLICY IF EXISTS "Public can view active feed sources" ON public.feed_sources;
+CREATE POLICY "Public can view active feed sources"
+    ON public.feed_sources FOR SELECT
+    USING (is_active = true);
+
+-- Allow full access for service_role / secret key
+DROP POLICY IF EXISTS "Service role can manage feed groups" ON public.feed_groups;
+CREATE POLICY "Service role can manage feed groups"
+    ON public.feed_groups FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service role can manage feed sources" ON public.feed_sources;
+CREATE POLICY "Service role can manage feed sources"
+    ON public.feed_sources FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- -- 5. Insert Feed Groups
+INSERT INTO public.feed_groups (key, label, color, order_index)
+VALUES
+    ('tech-business', 'ข่าวเทคโนโลยีและธุรกิจดิจิทัล', '#2F6FED', 1),
+    ('international', 'ข่าวไอทีต่างประเทศ', '#0284C7', 2),
+    ('thai-news', 'ข่าวสำนักข่าวไทย', '#D946EF', 3),
+    ('mobile', 'ข่าวมือถือและอุปกรณ์', '#17A673', 4),
+    ('computer-games', 'ข่าวคอมพิวเตอร์และเกม', '#F59E0B', 5),
+    ('ai-innovation', 'ปัญญาประดิษฐ์และ AI', '#8B5CF6', 6),
+    ('weather-forecast', 'สภาพอากาศและฟ้าฝน', '#0284C7', 7),
+    ('cybersecurity', 'ความปลอดภัยไซเบอร์และเตือนภัย', '#EF4444', 8),
+    ('ev-vehicles', 'ยานยนต์ไฟฟ้าและเทคโนโลยี EV', '#10B981', 9),
+    ('science-space', 'วิทยาศาสตร์และสำรวจอวกาศ', '#6366F1', 10),
+    ('fintech-crypto', 'การเงินดิจิทัลและบล็อกเชน', '#F59E0B', 11),
+    ('developer-coding', 'โปรแกรมมิ่งและนักพัฒนา', '#06B6D4', 12)
+ON CONFLICT (key) DO UPDATE
+SET label = EXCLUDED.label,
+    color = EXCLUDED.color,
+    order_index = EXCLUDED.order_index;
+
+-- 6. Insert Feed Sources
+INSERT INTO public.feed_sources (key, label, url, homepage, type, group_key, order_index, is_active)
+VALUES
+    -- Tech & Business
+    ('blognone', 'Blognone', 'https://www.blognone.com/atom.xml', 'https://www.blognone.com', 'atom', 'tech-business', 1, true),
+    ('brandinside', 'Brand Inside', 'https://brandinside.asia/feed/', 'https://brandinside.asia', 'rss', 'tech-business', 2, true),
+    ('marketingoops', 'Marketing Oops', 'https://www.marketingoops.com/feed/', 'https://www.marketingoops.com', 'rss', 'tech-business', 3, true),
+    ('adpt-news', 'ADPT News', 'https://www.adpt.news/feed/', 'https://www.adpt.news', 'rss', 'tech-business', 4, true),
+    ('borntodev', 'Born to Dev', 'https://www.borntodev.com/feed/', 'https://www.borntodev.com', 'rss', 'tech-business', 5, true),
+    ('techsauce', 'Techsauce', 'https://techsauce.co/feed', 'https://techsauce.co', 'rss', 'tech-business', 6, true),
+    ('beartai', 'Beartai', 'https://www.beartai.com/feed/', 'https://www.beartai.com', 'rss', 'tech-business', 7, true),
+    ('techtalkthai', 'TechTalkThai', 'https://www.techtalkthai.com/feed/', 'https://www.techtalkthai.com', 'rss', 'tech-business', 8, true),
+    ('techhub', 'Techhub', 'https://www.techhub.in.th/feed/', 'https://techhub.in.th', 'rss', 'tech-business', 9, true),
+    ('it24hrs', 'IT24Hrs', 'https://it24hrs.com/feed/', 'https://it24hrs.com', 'rss', 'tech-business', 10, true),
+    ('spin9', 'spin9', 'https://spin9.me/feed/', 'https://spin9.me', 'rss', 'tech-business', 11, true),
+    ('techoffside', 'TechOffside', 'https://www.techoffside.com/feed/', 'https://www.techoffside.com', 'rss', 'tech-business', 12, true),
+    ('thumbsup', 'Thumbsup', 'https://www.thumbsup.in.th/feed', 'https://www.thumbsup.in.th', 'rss', 'tech-business', 13, true),
+    ('thaiware', 'Thaiware', 'https://www.thaiware.com/rss/rss_latestPost_news.php', 'https://www.thaiware.com', 'rss', 'tech-business', 14, true),
+    ('sanook-hitech-computer', 'Sanook Hitech Computer', 'https://rssfeeds.sanook.com/rss/feeds/sanook/hitech.computer.index.xml', 'https://hitech.sanook.com', 'rss', 'tech-business', 15, true),
+    ('google-tech-th', 'Google ข่าวไอที', 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGRqTVhZU0FuUm9HZ0pVU0NnQVAB?hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'tech-business', 16, true),
+
+    -- International Tech
+    ('techcrunch', 'TechCrunch', 'https://techcrunch.com/feed/', 'https://techcrunch.com', 'rss', 'international', 1, true),
+    ('the-verge', 'The Verge', 'https://www.theverge.com/rss/index.xml', 'https://www.theverge.com', 'rss', 'international', 2, true),
+    ('ars-technica', 'Ars Technica', 'https://feeds.arstechnica.com/arstechnica/index', 'https://arstechnica.com', 'rss', 'international', 3, true),
+    ('wired', 'WIRED', 'https://www.wired.com/feed/rss', 'https://www.wired.com', 'rss', 'international', 4, true),
+    ('engadget', 'Engadget', 'https://www.engadget.com/rss.xml', 'https://www.engadget.com', 'rss', 'international', 5, true),
+    ('mit-technology-review', 'MIT Technology Review', 'https://www.technologyreview.com/feed/', 'https://www.technologyreview.com', 'rss', 'international', 6, true),
+    ('9to5mac', '9to5Mac', 'https://9to5mac.com/feed/', 'https://9to5mac.com', 'rss', 'international', 7, true),
+    ('9to5google', '9to5Google', 'https://9to5google.com/feed/', 'https://9to5google.com', 'rss', 'international', 8, true),
+    ('android-authority', 'Android Authority', 'https://www.androidauthority.com/feed/', 'https://www.androidauthority.com', 'rss', 'international', 9, true),
+    ('android-police', 'Android Police', 'https://www.androidpolice.com/feed/', 'https://www.androidpolice.com', 'rss', 'international', 10, true),
+    ('macrumors', 'MacRumors', 'https://feeds.macrumors.com/MacRumors-All', 'https://www.macrumors.com', 'rss', 'international', 11, true),
+    ('tom-hardware', 'Tom’s Hardware', 'https://www.tomshardware.com/feeds/all', 'https://www.tomshardware.com', 'rss', 'international', 12, true),
+    ('pcmag', 'PCMag', 'https://www.pcmag.com/feeds', 'https://www.pcmag.com', 'rss', 'international', 13, true),
+    ('zdnet', 'ZDNET', 'https://www.zdnet.com/news/rss.xml', 'https://www.zdnet.com', 'rss', 'international', 14, true),
+    ('venturebeat', 'VentureBeat', 'https://venturebeat.com/feed/', 'https://venturebeat.com', 'rss', 'international', 15, true),
+    ('techradar', 'TechRadar', 'https://www.techradar.com/rss', 'https://www.techradar.com', 'rss', 'international', 16, true),
+
+    -- Thai News
+    ('thestandard', 'THE STANDARD', 'https://thestandard.co/feed/', 'https://thestandard.co', 'rss', 'thai-news', 1, true),
+    ('thaipbs', 'Thai PBS', 'https://news.thaipbs.or.th/rss/news/home', 'https://www.thaipbs.or.th', 'rss', 'thai-news', 2, true),
+    ('bbc-thai', 'BBC News ไทย', 'https://feeds.bbci.co.uk/thai/rss.xml', 'https://www.bbc.com/thai', 'rss', 'thai-news', 3, true),
+    ('workpoint-today', 'TODAY', 'https://www.workpointtoday.com/feed', 'https://www.workpointtoday.com', 'rss', 'thai-news', 4, true),
+    ('sanook-news', 'Sanook News', 'https://rssfeeds.sanook.com/rss/feeds/sanook/news.index.xml', 'https://www.sanook.com/news', 'rss', 'thai-news', 5, true),
+    ('the-momentum', 'The Momentum', 'https://themomentum.co/feed/', 'https://themomentum.co', 'rss', 'thai-news', 6, true),
+    ('nation', 'Nation TV', 'https://www.nationtv.tv/main/rss', 'https://www.nationtv.tv', 'rss', 'thai-news', 7, true),
+    ('matichon', 'Matichon', 'https://www.matichon.co.th/feed', 'https://www.matichon.co.th', 'rss', 'thai-news', 8, true),
+    ('dailynews', 'DailyNews', 'https://www.dailynews.co.th/news/feed/', 'https://www.dailynews.co.th', 'rss', 'thai-news', 9, true),
+    ('khaosod', 'Khaosod', 'https://www.khaosod.co.th/feed', 'https://www.khaosod.co.th', 'rss', 'thai-news', 10, true),
+    ('mgronline', 'MGR Online', 'https://mgronline.com/store/rss/index.xml', 'https://mgronline.com', 'rss', 'thai-news', 11, true),
+    ('prachachat', 'Prachachat', 'https://www.prachachat.net/feed', 'https://www.prachachat.net', 'rss', 'thai-news', 12, true),
+
+    -- Mobile & Devices
+    ('specphone', 'Specphone', 'https://specphone.com/web/feed', 'https://specphone.com', 'rss', 'mobile', 1, true),
+    ('appdisqus', 'AppDisqus', 'https://www.appdisqus.com/feed/', 'https://www.appdisqus.com', 'rss', 'mobile', 2, true),
+    ('flashfly', 'Flashfly', 'https://www.flashfly.net/wp/feed', 'https://www.flashfly.net', 'rss', 'mobile', 3, true),
+    ('iphone-mod', 'iMoD', 'https://www.iphonemod.net/feed', 'https://www.iphonemod.net', 'rss', 'mobile', 4, true),
+    ('droidsans', 'DroidSans', 'https://droidsans.com/feed/', 'https://droidsans.com', 'rss', 'mobile', 5, true),
+    ('whatphone', 'WhatPhone', 'https://whatphone.net/feed/', 'https://whatphone.net', 'rss', 'mobile', 6, true),
+    ('google-android', 'Google Android', 'https://news.google.com/rss/search?q=Android&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'mobile', 7, true),
+    ('google-iphone', 'Apple / iPhone', 'https://news.google.com/rss/search?q=Apple+OR+iPhone&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'mobile', 8, true),
+
+    -- Computer & Gaming
+    ('notebookspec', 'NotebookSPEC', 'https://notebookspec.com/web/feed', 'https://notebookspec.com', 'rss', 'computer-games', 1, true),
+    ('gamingdose', 'GamingDose', 'https://www.gamingdose.com/feed/', 'https://www.gamingdose.com', 'rss', 'computer-games', 2, true),
+    ('game-ded', 'Game-Ded', 'https://www.game-ded.com/feed', 'https://www.game-ded.com', 'rss', 'computer-games', 3, true),
+    ('gamemonday', 'GameMonday', 'https://www.gamemonday.com/feed', 'https://www.gamemonday.com', 'rss', 'computer-games', 4, true),
+    ('extremeit', 'Extreme IT', 'https://www.extremeit.com/feed/', 'https://www.extremeit.com', 'rss', 'computer-games', 5, true),
+    ('google-cloud', 'Cloud / DC', 'https://news.google.com/rss/search?q=Cloud+OR+Data+Center&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'computer-games', 6, true),
+
+    -- AI Innovation (ปัญญาประดิษฐ์และ AI)
+    ('google-ai-th', 'Google ข่าว AI (ไทย)', 'https://news.google.com/rss/search?q=AI+OR+ปัญญาประดิษฐ์&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'ai-innovation', 1, true),
+    ('techcrunch-ai', 'TechCrunch AI', 'https://techcrunch.com/category/artificial-intelligence/feed/', 'https://techcrunch.com', 'rss', 'ai-innovation', 2, true),
+    ('venturebeat-ai', 'VentureBeat AI', 'https://venturebeat.com/category/ai/feed/', 'https://venturebeat.com', 'rss', 'ai-innovation', 3, true),
+
+    -- Weather Forecast (สภาพอากาศและฟ้าฝน)
+    ('tmd-warning', 'กรมอุตุนิยมวิทยา (เตือนภัย)', 'https://www.tmd.go.th/feed/warning', 'https://www.tmd.go.th', 'rss', 'weather-forecast', 1, true),
+    ('tmd-daily', 'กรมอุตุนิยมวิทยา (พยากรณ์ประจำวัน)', 'https://www.tmd.go.th/feed/daily', 'https://www.tmd.go.th', 'rss', 'weather-forecast', 2, true),
+    ('google-weather-th', 'ข่าวพยากรณ์อากาศ (Google News)', 'https://news.google.com/rss/search?q=พยากรณ์อากาศ+OR+ฝนตก&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'weather-forecast', 3, true),
+    ('google-storm-th', 'ข่าวพายุ & น้ำท่วม (Google News)', 'https://news.google.com/rss/search?q=พายุ+OR+น้ำท่วม&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'weather-forecast', 4, true),
+    ('google-pm25-th', 'รายงานฝุ่น PM2.5 (Google News)', 'https://news.google.com/rss/search?q=PM2.5+OR+คุณภาพอากาศ&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'weather-forecast', 5, true),
+    ('thaipbs-weather', 'Thai PBS สภาพแวดล้อม & อากาศ', 'https://www.thaipbs.or.th/rss/environment', 'https://www.thaipbs.or.th', 'rss', 'weather-forecast', 6, true),
+
+    -- Cybersecurity (ความปลอดภัยไซเบอร์และเตือนภัย)
+    ('thehackernews', 'The Hacker News', 'https://feeds.feedburner.com/TheHackersNews', 'https://thehackernews.com', 'rss', 'cybersecurity', 1, true),
+    ('google-cyber-th', 'Google เตือนภัยไซเบอร์ & แก๊งคอล', 'https://news.google.com/rss/search?q=ไซเบอร์+OR+แฮกเกอร์+OR+แก๊งคอลเซ็นเตอร์&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'cybersecurity', 2, true),
+    ('google-security-th', 'Google ข่าวความมั่นคงปลอดภัย', 'https://news.google.com/rss/search?q=ความมั่นคงปลอดภัยไซเบอร์+OR+ภัยไซเบอร์&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'cybersecurity', 3, true),
+
+    -- EV & Vehicles (ยานยนต์ไฟฟ้าและเทคโนโลยี EV)
+    ('autolifethailand', 'Autolife Thailand', 'https://autolifethailand.tv/feed/', 'https://autolifethailand.tv', 'rss', 'ev-vehicles', 1, true),
+    ('google-ev-th', 'Google ข่าวรถยนต์ไฟฟ้า EV', 'https://news.google.com/rss/search?q=รถยนต์ไฟฟ้า+OR+EV&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'ev-vehicles', 2, true),
+    ('insideevs', 'InsideEVs', 'https://insideevs.com/rss/news/all/', 'https://insideevs.com', 'rss', 'ev-vehicles', 3, true),
+
+    -- Science & Space (วิทยาศาสตร์และสำรวจอวกาศ)
+    ('google-space-th', 'Google ข่าวอวกาศ & ดาราศาสตร์', 'https://news.google.com/rss/search?q=อวกาศ+OR+ดาราศาสตร์+OR+SpaceX&hl=th&gl=TH&ceid=TH:th', 'https://news.google.com', 'rss', 'science-space', 1, true),
+    ('space-com', 'Space.com', 'https://www.space.com/feeds/all', 'https://www.space.com', 'rss', 'science-space', 2, true),
+
+    -- FinTech & Crypto (การเงินดิจิทัลและบล็อกเชน)
+    ('siamblockchain', 'Siam Blockchain', 'https://siamblockchain.com/feed/', 'https://siamblockchain.com', 'rss', 'fintech-crypto', 1, true),
+    ('bitcoinaddict', 'Bitcoin Addict', 'https://bitcoinaddict.org/feed/', 'https://bitcoinaddict.org', 'rss', 'fintech-crypto', 2, true),
+    ('cointelegraph', 'Cointelegraph', 'https://cointelegraph.com/rss', 'https://cointelegraph.com', 'rss', 'fintech-crypto', 3, true),
+
+    -- Developer & Coding (โปรแกรมมิ่งและนักพัฒนา)
+    ('dev-to', 'DEV Community', 'https://dev.to/feed', 'https://dev.to', 'rss', 'developer-coding', 1, true),
+    ('github-blog', 'GitHub Blog', 'https://github.blog/feed/', 'https://github.blog', 'rss', 'developer-coding', 2, true),
+    ('freecodecamp', 'freeCodeCamp', 'https://www.freecodecamp.org/news/rss/', 'https://www.freecodecamp.org', 'rss', 'developer-coding', 3, true)
+ON CONFLICT (key) DO UPDATE
+SET label = EXCLUDED.label,
+    url = EXCLUDED.url,
+    homepage = EXCLUDED.homepage,
+    type = EXCLUDED.type,
+    group_key = EXCLUDED.group_key,
+    order_index = EXCLUDED.order_index,
+    is_active = EXCLUDED.is_active;
+
+-- ==============================================================================
+-- 7. Create App Settings Table (Remote Config)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.app_settings (
+    id TEXT PRIMARY KEY DEFAULT 'default',
+
+    -- AI & TTS
+    is_ai_enabled BOOLEAN NOT NULL DEFAULT true,
+    ai_model_name TEXT NOT NULL DEFAULT 'gemini-1.5-flash',
+    ai_max_tokens INTEGER NOT NULL DEFAULT 400,
+    tts_default_rate NUMERIC(3,2) NOT NULL DEFAULT 0.95,
+
+    -- Ads (AdMob)
+    ads_enabled BOOLEAN NOT NULL DEFAULT false,
+    banner_ads_enabled BOOLEAN NOT NULL DEFAULT false,
+    interstitial_ads_enabled BOOLEAN NOT NULL DEFAULT false,
+    interstitial_interval_clicks INTEGER NOT NULL DEFAULT 4,
+    interstitial_min_delay_sec INTEGER NOT NULL DEFAULT 60,
+    admob_banner_id_android TEXT,
+    admob_interstitial_id_android TEXT,
+
+    -- Versions & Maintenance
+    min_supported_version TEXT NOT NULL DEFAULT '1.0.0',
+    latest_version TEXT NOT NULL DEFAULT '1.0.0',
+    force_update_title TEXT DEFAULT 'มีเวอร์ชันใหม่พร้อมใช้งาน',
+    force_update_message TEXT DEFAULT 'กรุณาอัปเดตเป็นเวอร์ชันล่าสุดเพื่อการใช้งานที่ราบรื่นและปลอดภัย',
+    is_maintenance BOOLEAN NOT NULL DEFAULT false,
+    maintenance_message TEXT DEFAULT 'ระบบกำลังปิดปรับปรุงชั่วคราว ทีมงานกำลังเร่งแก้ไขครับ',
+
+    -- Legal & Contact URLs
+    privacy_policy_url TEXT DEFAULT 'https://pongploydev.github.io/privacy-policy',
+    terms_url TEXT DEFAULT 'https://pongploydev.github.io/terms',
+    support_email TEXT DEFAULT 'pongku71@gmail.com',
+    play_store_url TEXT DEFAULT 'https://play.google.com/store/apps/details?id=com.pongploydev.technewsth.app',
+
+    -- Announcements & Breaking News
+    announcement_active BOOLEAN NOT NULL DEFAULT false,
+    announcement_message TEXT,
+    breaking_news_active BOOLEAN NOT NULL DEFAULT false,
+    breaking_news_text TEXT,
+    breaking_news_url TEXT,
+
+    -- Defaults & Cache
+    default_feed_key TEXT NOT NULL DEFAULT 'tech-business',
+    cache_ttl_minutes INTEGER NOT NULL DEFAULT 15,
+
+    -- Layout & UI Defaults
+    default_card_layout TEXT NOT NULL DEFAULT 'magazine',
+    default_theme_mode TEXT NOT NULL DEFAULT 'system',
+    default_link_open_mode TEXT NOT NULL DEFAULT 'in_app',
+    default_font_size TEXT NOT NULL DEFAULT 'medium',
+    data_saver_default BOOLEAN NOT NULL DEFAULT false,
+    cloud_sync_enabled BOOLEAN NOT NULL DEFAULT true,
+    related_news_limit INTEGER NOT NULL DEFAULT 10,
+    rss_source_name TEXT NOT NULL DEFAULT 'Blognone',
+    rss_source_url TEXT NOT NULL DEFAULT 'https://www.blognone.com',
+    contact_custom_url TEXT,
+
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.app_settings ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can view app settings" ON public.app_settings;
+CREATE POLICY "Public can view app settings"
+    ON public.app_settings FOR SELECT
+    USING (true);
+
+DROP POLICY IF EXISTS "Service role can manage app settings" ON public.app_settings;
+CREATE POLICY "Service role can manage app settings"
+    ON public.app_settings FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+INSERT INTO public.app_settings (
+    id,
+    is_ai_enabled,
+    ads_enabled,
+    banner_ads_enabled,
+    interstitial_ads_enabled,
+    interstitial_interval_clicks,
+    interstitial_min_delay_sec,
+    min_supported_version,
+    latest_version,
+    default_feed_key,
+    default_card_layout,
+    default_theme_mode,
+    default_link_open_mode,
+    default_font_size,
+    data_saver_default,
+    cloud_sync_enabled,
+    related_news_limit,
+    rss_source_name,
+    rss_source_url
+)
+VALUES (
+    'default',
+    true,
+    false,
+    false,
+    false,
+    4,
+    60,
+    '1.0.0',
+    '1.0.0',
+    'tech-business',
+    'magazine',
+    'system',
+    'in_app',
+    'medium',
+    false,
+    true,
+    10,
+    'Blognone',
+    'https://www.blognone.com'
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ==============================================================================
+-- 8. Create User Feedback & Bug Report Table
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.app_feedbacks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category TEXT NOT NULL DEFAULT 'general',
+    message TEXT NOT NULL,
+    contact TEXT,
+    app_version TEXT,
+    device_platform TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.app_feedbacks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public can submit feedback" ON public.app_feedbacks;
+CREATE POLICY "Public can submit feedback"
+    ON public.app_feedbacks FOR INSERT
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service role can view feedback" ON public.app_feedbacks;
+CREATE POLICY "Service role can view feedback"
+    ON public.app_feedbacks FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+-- ==============================================================================
+-- 9. Create User Bookmarks Table (Cloud Bookmarks)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.user_bookmarks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id TEXT NOT NULL,
+    article_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    link TEXT NOT NULL,
+    description TEXT,
+    content TEXT,
+    image_url TEXT,
+    video_url TEXT,
+    author TEXT,
+    published_at TEXT,
+    published_millis BIGINT,
+    reading_time INTEGER DEFAULT 1,
+    images JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT user_bookmarks_device_article_unique UNIQUE (device_id, article_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_device_id ON public.user_bookmarks(device_id);
+CREATE INDEX IF NOT EXISTS idx_user_bookmarks_created_at ON public.user_bookmarks(created_at DESC);
+
+ALTER TABLE public.user_bookmarks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can read own bookmarks by device_id" ON public.user_bookmarks;
+CREATE POLICY "Users can read own bookmarks by device_id"
+    ON public.user_bookmarks FOR SELECT
+    USING (true);
+
+DROP POLICY IF EXISTS "Users can insert own bookmarks by device_id" ON public.user_bookmarks;
+CREATE POLICY "Users can insert own bookmarks by device_id"
+    ON public.user_bookmarks FOR INSERT
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can update own bookmarks by device_id" ON public.user_bookmarks;
+CREATE POLICY "Users can update own bookmarks by device_id"
+    ON public.user_bookmarks FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Users can delete own bookmarks by device_id" ON public.user_bookmarks;
+CREATE POLICY "Users can delete own bookmarks by device_id"
+    ON public.user_bookmarks FOR DELETE
+    USING (true);
+
+DROP POLICY IF EXISTS "Service role can manage user_bookmarks" ON public.user_bookmarks;
+CREATE POLICY "Service role can manage user_bookmarks"
+    ON public.user_bookmarks FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
+

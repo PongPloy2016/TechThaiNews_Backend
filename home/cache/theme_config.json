@@ -1,0 +1,15 @@
+{
+    "theme_mode": "system",
+    "accent_color": "#10b981",
+    "bg_style": "warm_paper",
+    "font_family": "Prompt",
+    "card_radius": "14px",
+    "card_layout": "magazine",
+    "admin_bg_style": "mesh_canvas",
+    "admin_sidebar_style": "midnight",
+    "admin_primary_color": "#2563eb",
+    "updated_at": "2026-10-10 06:35:13",
+    "name": "Cyber Sky (ค่าเริ่มต้น)",
+    "description": "ทันสมัยสไตล์พอร์ทัลข่าวเทค สว่างสดใส คอนทราสต์สูง",
+    "badge_color": "#0ea5e9"
+}

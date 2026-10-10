@@ -1,0 +1,17 @@
+{
+    "name": "dana-core/ipg-package",
+    "description": "PHP Wrapper for DANA Payment API.",
+    "homepage": "https://dana.id",
+    "version": "1.0",
+    "type": "library",
+    "license":"MIT",
+    "authors": [
+        {
+            "name": "I Made Bayu Permana Putra",
+            "email": "i.putra@dana.id"
+        }
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^9.5"
+    }
+}
