@@ -83,3 +83,5 @@ config/config.php
 logs/*.log
 home/config.local.php
 contact/config.local.php
+application/cache/sessions/*
+!application/cache/sessions/index.html

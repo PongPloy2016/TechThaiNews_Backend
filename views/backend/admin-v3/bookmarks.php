@@ -398,6 +398,14 @@ arsort($catCounts);
             </div>
         <?php endif; ?>
 
+        <!-- Cloud-Direct Notice if MySQL not connected -->
+        <?php if (!empty($syncCounts['is_cloud_only'])): ?>
+            <div class="alert alert-info alert-dismissible" style="border-radius: 12px; font-weight: 500; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; box-shadow: 0 4px 12px rgba(59,130,246,0.1); margin-bottom: 20px;">
+                <button type="button" class="close" data-dismiss="alert">&times;</button>
+                <i class="fa fa-info-circle"></i> <strong>โหมด Cloud Supabase โดยตรง:</strong> กำลังแสดงผลบุ๊กมาร์กสดจาก Supabase Cloud (<?= $totalCount ?> รายการ) | ไม่พบการเชื่อมต่อ MySQL ในเครื่อง/โฮสต์ คุณยังสามารถเรียกดู คัดลอกลิงก์ และจัดการข้อมูลผ่านหน้านี้ได้ตามปกติ
+            </div>
+        <?php endif; ?>
+
         <!-- 🚀 Hero Banner -->
         <div class="bm-hero-banner">
             <div class="row align-items-center" style="display: flex; align-items: center; flex-wrap: wrap;">
@@ -407,9 +415,15 @@ arsort($catCounts);
                         รองรับการจัดเก็บข้อมูลแบบสองทาง: ในฐานข้อมูลเครื่อง <strong>Local MySQL (bookmarks)</strong> และคลาวด์ <strong>Supabase (user_bookmarks)</strong> พร้อมสถานะการซิงค์แบบเรียลไทม์
                     </p>
                     <div class="bm-stats-row">
-                        <div class="bm-stat-chip">
-                            <i class="fa fa-database"></i> ฐานข้อมูล: <strong>MySQL & Supabase</strong>
-                        </div>
+                        <?php if (!empty($syncCounts['is_cloud_only'])): ?>
+                            <div class="bm-stat-chip" style="background: rgba(59, 130, 246, 0.25); border-color: rgba(59, 130, 246, 0.4); color: #93c5fd;">
+                                <i class="fa fa-cloud"></i> ฐานข้อมูล: <strong>Cloud Supabase (Direct)</strong>
+                            </div>
+                        <?php else: ?>
+                            <div class="bm-stat-chip">
+                                <i class="fa fa-database"></i> ฐานข้อมูล: <strong>MySQL & Supabase</strong>
+                            </div>
+                        <?php endif; ?>
                         <div class="bm-stat-chip" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.35); color: #6ee7b7;">
                             <i class="fa fa-cloud"></i> สถานะซิงค์: <strong><?= $syncedCount ?> / <?= $totalCount ?> สำเร็จ</strong>
                         </div>
@@ -650,6 +664,7 @@ arsort($catCounts);
         <form method="POST" action="<?= admin_url("bookmarks") ?>">
             <input type="hidden" name="delete_bookmark" value="1">
             <input type="hidden" name="bookmark_id" id="deleteBmId" value="">
+            <input type="hidden" name="supabase_id" id="deleteBmSbId" value="">
             <div class="modal-content" style="border-radius: 16px; overflow: hidden; border: none; box-shadow: 0 16px 40px rgba(0,0,0,0.2);">
                 <div class="modal-body text-center" style="padding: 26px 20px;">
                     <div style="width: 52px; height: 52px; border-radius: 50%; background: #fee2e2; color: #ef4444; font-size: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
@@ -735,6 +750,8 @@ async function syncSingleBookmark(bookmarkId) {
 
 function confirmDeleteBookmark(id, sbId) {
     document.getElementById('deleteBmId').value = id;
+    var sbEl = document.getElementById('deleteBmSbId');
+    if (sbEl) sbEl.value = sbId || '';
     $('#modalDeleteBookmark').modal('show');
 }
 

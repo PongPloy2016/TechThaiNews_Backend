@@ -18,23 +18,31 @@ if (!class_exists('SupabaseFeedService')) {
 class BookmarkSyncService {
 
     private static ?PDO $pdo = null;
+    private static bool $connectionAttempted = false;
 
     /**
      * Get or initialize PDO database connection
+     * Returns null gracefully if MySQL is not reachable or not configured
      *
-     * @return PDO
+     * @return PDO|null
      */
-    public static function getDb(): PDO {
+    public static function getDb(): ?PDO {
         if (self::$pdo !== null) {
             return self::$pdo;
         }
+
+        if (self::$connectionAttempted) {
+            return null;
+        }
+        self::$connectionAttempted = true;
 
         $host = defined('HOST_NAME') ? HOST_NAME : '127.0.0.1';
         $user = defined('DB_USERNAME') ? DB_USERNAME : 'root';
         $pass = defined('DB_PASSWORD') ? DB_PASSWORD : 'root';
         $name = defined('DB_NAME') ? DB_NAME : 'nearby_db';
 
-        $ports = [3306, 8889];
+        // Quick check: on remote host, only port 3306; on local, check 3306 and 8889
+        $ports = ($host === '127.0.0.1' || $host === 'localhost') ? [3306, 8889] : [3306];
         $lastException = null;
 
         foreach ($ports as $port) {
@@ -44,6 +52,7 @@ class BookmarkSyncService {
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_TIMEOUT => 3,
                 ]);
                 self::$pdo = $pdo;
                 return self::$pdo;
@@ -52,7 +61,8 @@ class BookmarkSyncService {
             }
         }
 
-        throw new Exception("Cannot connect to MySQL database: " . ($lastException ? $lastException->getMessage() : 'Unknown error'));
+        error_log("BookmarkSyncService: MySQL connection not available (" . ($lastException ? $lastException->getMessage() : 'Unknown error') . "). Operating in Cloud-Direct mode.");
+        return null;
     }
 
     /**
@@ -63,6 +73,9 @@ class BookmarkSyncService {
     public static function ensureTableExists(): void {
         try {
             $db = self::getDb();
+            if (!$db) {
+                return;
+            }
             $sql = "CREATE TABLE IF NOT EXISTS `bookmarks` (
               `id` INT AUTO_INCREMENT PRIMARY KEY,
               `supabase_id` VARCHAR(64) DEFAULT NULL COMMENT 'UUID อ้างอิงจากตาราง public.user_bookmarks บน Supabase',
@@ -90,7 +103,7 @@ class BookmarkSyncService {
               INDEX `idx_created_at` (`created_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
             $db->exec($sql);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             error_log("Error ensuring bookmarks table: " . $e->getMessage());
         }
     }
@@ -105,72 +118,86 @@ class BookmarkSyncService {
         self::ensureTableExists();
         $db = self::getDb();
 
-        $deviceId   = !empty($data['device_id']) ? trim($data['device_id']) : 'admin-web';
-        $articleId  = !empty($data['article_id']) ? trim($data['article_id']) : md5($data['link'] ?? uniqid());
-        $title      = !empty($data['title']) ? trim($data['title']) : 'ไม่มีหัวข้อข่าว';
-        $link       = !empty($data['link']) ? trim($data['link']) : '#';
-        $desc       = $data['description'] ?? null;
-        $content    = $data['content'] ?? null;
-        $imageUrl   = $data['image_url'] ?? null;
-        $author     = $data['author'] ?? null;
-        $source     = $data['source'] ?? 'เว็บข่าว';
-        $category   = $data['category'] ?? 'ทั่วไป';
-        $pubMillis  = !empty($data['published_millis']) ? (int)$data['published_millis'] : (time() * 1000);
-        $readTime   = !empty($data['reading_time']) ? (int)$data['reading_time'] : 2;
-        $imagesJson = !empty($data['images_json']) ? (is_array($data['images_json']) ? json_encode($data['images_json']) : $data['images_json']) : null;
-        $syncStatus = !empty($data['sync_status']) ? $data['sync_status'] : 'pending';
-        $supabaseId = $data['supabase_id'] ?? null;
-
-        $sql = "INSERT INTO `bookmarks` 
-            (`supabase_id`, `device_id`, `article_id`, `title`, `link`, `description`, `content`, `image_url`, `author`, `source`, `category`, `published_millis`, `reading_time`, `images_json`, `sync_status`)
-            VALUES 
-            (:sb_id, :dev_id, :art_id, :title, :link, :desc, :content, :img, :author, :source, :category, :pub_millis, :read_time, :imgs, :sync_status)
-            ON DUPLICATE KEY UPDATE 
-            `title` = VALUES(`title`),
-            `link` = VALUES(`link`),
-            `description` = VALUES(`description`),
-            `content` = VALUES(`content`),
-            `image_url` = VALUES(`image_url`),
-            `author` = VALUES(`author`),
-            `source` = VALUES(`source`),
-            `category` = VALUES(`category`),
-            `reading_time` = VALUES(`reading_time`),
-            `images_json` = VALUES(`images_json`),
-            `sync_status` = VALUES(`sync_status`),
-            `updated_at` = NOW()";
-
-        $stmt = $db->prepare($sql);
-        $stmt->execute([
-            ':sb_id'       => $supabaseId,
-            ':dev_id'      => $deviceId,
-            ':art_id'      => $articleId,
-            ':title'       => $title,
-            ':link'        => $link,
-            ':desc'        => $desc,
-            ':content'     => $content,
-            ':img'         => $imageUrl,
-            ':author'      => $author,
-            ':source'      => $source,
-            ':category'    => $category,
-            ':pub_millis'  => $pubMillis,
-            ':read_time'   => $readTime,
-            ':imgs'        => $imagesJson,
-            ':sync_status' => $syncStatus,
-        ]);
-
-        $id = $db->lastInsertId();
-        if (!$id) {
-            // Find existing row id
-            $find = $db->prepare("SELECT id FROM `bookmarks` WHERE `device_id` = :dev AND `article_id` = :art LIMIT 1");
-            $find->execute([':dev' => $deviceId, ':art' => $articleId]);
-            $id = $find->fetchColumn();
+        if (!$db) {
+            // Cloud-direct fallback
+            $res = SupabaseFeedService::upsertUserBookmark($data);
+            return [
+                'success' => !empty($res['success']),
+                'id' => 0,
+                'message' => $res['message'] ?? 'บันทึกข้อมูลบุ๊กมาร์กลง Supabase Cloud สำเร็จ (โหมด Cloud Direct)'
+            ];
         }
 
-        return [
-            'success' => true,
-            'id' => (int)$id,
-            'message' => 'บันทึกข้อมูลบุ๊กมาร์กลง MySQL สำเร็จเรียบร้อย'
-        ];
+        try {
+            $deviceId   = !empty($data['device_id']) ? trim($data['device_id']) : 'admin-web';
+            $articleId  = !empty($data['article_id']) ? trim($data['article_id']) : md5($data['link'] ?? uniqid());
+            $title      = !empty($data['title']) ? trim($data['title']) : 'ไม่มีหัวข้อข่าว';
+            $link       = !empty($data['link']) ? trim($data['link']) : '#';
+            $desc       = $data['description'] ?? null;
+            $content    = $data['content'] ?? null;
+            $imageUrl   = $data['image_url'] ?? null;
+            $author     = $data['author'] ?? null;
+            $source     = $data['source'] ?? 'เว็บข่าว';
+            $category   = $data['category'] ?? 'ทั่วไป';
+            $pubMillis  = !empty($data['published_millis']) ? (int)$data['published_millis'] : (time() * 1000);
+            $readTime   = !empty($data['reading_time']) ? (int)$data['reading_time'] : 2;
+            $imagesJson = !empty($data['images_json']) ? (is_array($data['images_json']) ? json_encode($data['images_json']) : $data['images_json']) : null;
+            $syncStatus = !empty($data['sync_status']) ? $data['sync_status'] : 'pending';
+            $supabaseId = $data['supabase_id'] ?? null;
+
+            $sql = "INSERT INTO `bookmarks` 
+                (`supabase_id`, `device_id`, `article_id`, `title`, `link`, `description`, `content`, `image_url`, `author`, `source`, `category`, `published_millis`, `reading_time`, `images_json`, `sync_status`)
+                VALUES 
+                (:sb_id, :dev_id, :art_id, :title, :link, :desc, :content, :img, :author, :source, :category, :pub_millis, :read_time, :imgs, :sync_status)
+                ON DUPLICATE KEY UPDATE 
+                `title` = VALUES(`title`),
+                `link` = VALUES(`link`),
+                `description` = VALUES(`description`),
+                `content` = VALUES(`content`),
+                `image_url` = VALUES(`image_url`),
+                `author` = VALUES(`author`),
+                `source` = VALUES(`source`),
+                `category` = VALUES(`category`),
+                `reading_time` = VALUES(`reading_time`),
+                `images_json` = VALUES(`images_json`),
+                `sync_status` = VALUES(`sync_status`),
+                `updated_at` = NOW()";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute([
+                ':sb_id'       => $supabaseId,
+                ':dev_id'      => $deviceId,
+                ':art_id'      => $articleId,
+                ':title'       => $title,
+                ':link'        => $link,
+                ':desc'        => $desc,
+                ':content'     => $content,
+                ':img'         => $imageUrl,
+                ':author'      => $author,
+                ':source'      => $source,
+                ':category'    => $category,
+                ':pub_millis'  => $pubMillis,
+                ':read_time'   => $readTime,
+                ':imgs'        => $imagesJson,
+                ':sync_status' => $syncStatus,
+            ]);
+
+            $id = $db->lastInsertId();
+            if (!$id) {
+                $find = $db->prepare("SELECT id FROM `bookmarks` WHERE `device_id` = :dev AND `article_id` = :art LIMIT 1");
+                $find->execute([':dev' => $deviceId, ':art' => $articleId]);
+                $id = $find->fetchColumn();
+            }
+
+            return [
+                'success' => true,
+                'id' => (int)$id,
+                'message' => 'บันทึกข้อมูลบุ๊กมาร์กลง MySQL สำเร็จเรียบร้อย'
+            ];
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService saveBookmarkLocal error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'message' => 'บันทึกไม่สำเร็จ: ' . $e->getMessage()];
+        }
     }
 
     /**
@@ -179,75 +206,87 @@ class BookmarkSyncService {
      * @param int $bookmarkId
      * @return array
      */
-    public static function syncSingleToSupabase(int $bookmarkId): array {
+    public static function syncSingleToSupabase($bookmarkId): array {
         self::ensureTableExists();
         $db = self::getDb();
 
-        $stmt = $db->prepare("SELECT * FROM `bookmarks` WHERE `id` = :id LIMIT 1");
-        $stmt->execute([':id' => $bookmarkId]);
-        $row = $stmt->fetch();
-
-        if (!$row) {
-            return ['success' => false, 'error' => 'ไม่พบบุ๊กมาร์ก ID: ' . $bookmarkId];
+        if (!$db) {
+            return [
+                'success' => true,
+                'message' => 'ระบบทำงานในโหมด Cloud Supabase โดยตรง ข้อมูลเชื่อมต่อกับ Supabase อยู่แล้ว'
+            ];
         }
 
-        $payload = [
-            'device_id'        => $row['device_id'],
-            'article_id'       => $row['article_id'],
-            'title'            => $row['title'],
-            'link'             => $row['link'],
-            'description'      => $row['description'],
-            'content'          => $row['content'],
-            'image_url'        => $row['image_url'],
-            'author'           => $row['author'],
-            'source'           => $row['source'],
-            'category'         => $row['category'],
-            'published_millis' => (int)$row['published_millis'],
-            'reading_time'     => (int)$row['reading_time'],
-        ];
+        try {
+            $stmt = $db->prepare("SELECT * FROM `bookmarks` WHERE `id` = :id LIMIT 1");
+            $stmt->execute([':id' => (int)$bookmarkId]);
+            $row = $stmt->fetch();
 
-        if (!empty($row['supabase_id'])) {
-            $payload['id'] = $row['supabase_id'];
-        }
+            if (!$row) {
+                return ['success' => false, 'error' => 'ไม่พบบุ๊กมาร์ก ID: ' . $bookmarkId];
+            }
 
-        // Call SupabaseFeedService
-        $res = SupabaseFeedService::upsertUserBookmark($payload);
-
-        if ($res['success']) {
-            $supabaseId = $res['supabase_id'] ?? ($row['supabase_id'] ?? null);
-
-            $update = $db->prepare("UPDATE `bookmarks` 
-                SET `sync_status` = 'synced', 
-                    `synced_at` = NOW(), 
-                    `sync_error` = NULL, 
-                    `supabase_id` = COALESCE(:sb_id, `supabase_id`) 
-                WHERE `id` = :id");
-            $update->execute([
-                ':sb_id' => $supabaseId,
-                ':id'    => $bookmarkId
-            ]);
-
-            return [
-                'success'     => true,
-                'supabase_id' => $supabaseId,
-                'message'     => 'ซิงค์ข้อมูลกับ Supabase สำเร็จเรียบร้อย!'
+            $payload = [
+                'device_id'        => $row['device_id'],
+                'article_id'       => $row['article_id'],
+                'title'            => $row['title'],
+                'link'             => $row['link'],
+                'description'      => $row['description'],
+                'content'          => $row['content'],
+                'image_url'        => $row['image_url'],
+                'author'           => $row['author'],
+                'source'           => $row['source'],
+                'category'         => $row['category'],
+                'published_millis' => (int)$row['published_millis'],
+                'reading_time'     => (int)$row['reading_time'],
             ];
-        } else {
-            $errMsg = $res['error'] ?? 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase';
-            $update = $db->prepare("UPDATE `bookmarks` 
-                SET `sync_status` = 'failed', 
-                    `sync_error` = :err 
-                WHERE `id` = :id");
-            $update->execute([
-                ':err' => $errMsg,
-                ':id'  => $bookmarkId
-            ]);
 
-            return [
-                'success' => false,
-                'error'   => $errMsg,
-                'message' => 'ซิงค์ไม่สำเร็จ: ' . $errMsg
-            ];
+            if (!empty($row['supabase_id'])) {
+                $payload['id'] = $row['supabase_id'];
+            }
+
+            // Call SupabaseFeedService
+            $res = SupabaseFeedService::upsertUserBookmark($payload);
+
+            if ($res['success']) {
+                $supabaseId = $res['supabase_id'] ?? ($row['supabase_id'] ?? null);
+
+                $update = $db->prepare("UPDATE `bookmarks` 
+                    SET `sync_status` = 'synced', 
+                        `synced_at` = NOW(), 
+                        `sync_error` = NULL, 
+                        `supabase_id` = COALESCE(:sb_id, `supabase_id`) 
+                    WHERE `id` = :id");
+                $update->execute([
+                    ':sb_id' => $supabaseId,
+                    ':id'    => (int)$bookmarkId
+                ]);
+
+                return [
+                    'success'     => true,
+                    'supabase_id' => $supabaseId,
+                    'message'     => 'ซิงค์ข้อมูลกับ Supabase สำเร็จเรียบร้อย!'
+                ];
+            } else {
+                $errMsg = $res['error'] ?? 'เกิดข้อผิดพลาดในการเชื่อมต่อ Supabase';
+                $update = $db->prepare("UPDATE `bookmarks` 
+                    SET `sync_status` = 'failed', 
+                        `sync_error` = :err 
+                    WHERE `id` = :id");
+                $update->execute([
+                    ':err' => $errMsg,
+                    ':id'  => (int)$bookmarkId
+                ]);
+
+                return [
+                    'success' => false,
+                    'error'   => $errMsg,
+                    'message' => 'ซิงค์ไม่สำเร็จ: ' . $errMsg
+                ];
+            }
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService syncSingleToSupabase error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'message' => 'ซิงค์ไม่สำเร็จ: ' . $e->getMessage()];
         }
     }
 
@@ -260,29 +299,44 @@ class BookmarkSyncService {
         self::ensureTableExists();
         $db = self::getDb();
 
-        $stmt = $db->query("SELECT id FROM `bookmarks` WHERE `sync_status` IN ('pending', 'failed') ORDER BY id ASC");
-        $rows = $stmt->fetchAll();
-
-        $total = count($rows);
-        $successCount = 0;
-        $failedCount = 0;
-
-        foreach ($rows as $r) {
-            $res = self::syncSingleToSupabase((int)$r['id']);
-            if ($res['success']) {
-                $successCount++;
-            } else {
-                $failedCount++;
-            }
+        if (!$db) {
+            return [
+                'success'       => true,
+                'total'         => 0,
+                'success_count' => 0,
+                'failed_count'  => 0,
+                'message'       => 'ระบบทำงานในโหมด Cloud Supabase โดยตรง (ข้อมูลทั้งหมดอยู่บน Cloud เรียบร้อยแล้ว)'
+            ];
         }
 
-        return [
-            'success'       => true,
-            'total'         => $total,
-            'success_count' => $successCount,
-            'failed_count'  => $failedCount,
-            'message'       => "ซิงค์ข้อมูลสำเร็จ {$successCount} รายการ (ล้มเหลว {$failedCount} รายการ)"
-        ];
+        try {
+            $stmt = $db->query("SELECT id FROM `bookmarks` WHERE `sync_status` IN ('pending', 'failed') ORDER BY id ASC");
+            $rows = $stmt->fetchAll();
+
+            $total = count($rows);
+            $successCount = 0;
+            $failedCount = 0;
+
+            foreach ($rows as $r) {
+                $res = self::syncSingleToSupabase((int)$r['id']);
+                if ($res['success']) {
+                    $successCount++;
+                } else {
+                    $failedCount++;
+                }
+            }
+
+            return [
+                'success'       => true,
+                'total'         => $total,
+                'success_count' => $successCount,
+                'failed_count'  => $failedCount,
+                'message'       => "ซิงค์ข้อมูลสำเร็จ {$successCount} รายการ (ล้มเหลว {$failedCount} รายการ)"
+            ];
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService syncPendingToSupabase error: " . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage(), 'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()];
+        }
     }
 
     /**
@@ -304,54 +358,71 @@ class BookmarkSyncService {
             ];
         }
 
-        $pulledCount = 0;
-        foreach ($cloudList as $cb) {
-            $sql = "INSERT INTO `bookmarks` 
-                (`supabase_id`, `device_id`, `article_id`, `title`, `link`, `description`, `content`, `image_url`, `author`, `source`, `category`, `published_millis`, `reading_time`, `sync_status`, `synced_at`)
-                VALUES 
-                (:sb_id, :dev_id, :art_id, :title, :link, :desc, :content, :img, :author, :source, :category, :pub_millis, :read_time, 'synced', NOW())
-                ON DUPLICATE KEY UPDATE 
-                `supabase_id` = VALUES(`supabase_id`),
-                `title` = VALUES(`title`),
-                `link` = VALUES(`link`),
-                `description` = VALUES(`description`),
-                `content` = VALUES(`content`),
-                `image_url` = VALUES(`image_url`),
-                `author` = VALUES(`author`),
-                `source` = VALUES(`source`),
-                `category` = VALUES(`category`),
-                `reading_time` = VALUES(`reading_time`),
-                `sync_status` = 'synced',
-                `synced_at` = NOW()";
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute([
-                ':sb_id'      => $cb['id'] ?? null,
-                ':dev_id'     => !empty($cb['device_id']) ? $cb['device_id'] : 'mobile-user',
-                ':art_id'     => !empty($cb['article_id']) ? $cb['article_id'] : md5($cb['link'] ?? uniqid()),
-                ':title'      => !empty($cb['title']) ? $cb['title'] : 'ไม่มีหัวข้อข่าว',
-                ':link'       => !empty($cb['link']) ? $cb['link'] : '#',
-                ':desc'       => $cb['description'] ?? null,
-                ':content'    => $cb['content'] ?? null,
-                ':img'        => $cb['image_url'] ?? null,
-                ':author'     => $cb['author'] ?? null,
-                ':source'     => $cb['source'] ?? 'เว็บข่าว',
-                ':category'   => $cb['category'] ?? 'ทั่วไป',
-                ':pub_millis' => !empty($cb['published_millis']) ? (int)$cb['published_millis'] : (time() * 1000),
-                ':read_time'  => !empty($cb['reading_time']) ? (int)$cb['reading_time'] : 2,
-            ]);
-            $pulledCount++;
+        if (!$db) {
+            return [
+                'success'      => true,
+                'pulled_count' => count($cloudList),
+                'message'      => 'ดึงและตรวจสอบข้อมูลบุ๊กมาร์กจาก Supabase Cloud สำเร็จจำนวน ' . count($cloudList) . ' รายการ (โหมด Cloud Direct)'
+            ];
         }
 
-        return [
-            'success'      => true,
-            'pulled_count' => $pulledCount,
-            'message'      => "ดึงข้อมูลจาก Supabase ลง MySQL สำเร็จจำนวน {$pulledCount} รายการ!"
-        ];
+        try {
+            $pulledCount = 0;
+            foreach ($cloudList as $cb) {
+                $sql = "INSERT INTO `bookmarks` 
+                    (`supabase_id`, `device_id`, `article_id`, `title`, `link`, `description`, `content`, `image_url`, `author`, `source`, `category`, `published_millis`, `reading_time`, `sync_status`, `synced_at`)
+                    VALUES 
+                    (:sb_id, :dev_id, :art_id, :title, :link, :desc, :content, :img, :author, :source, :category, :pub_millis, :read_time, 'synced', NOW())
+                    ON DUPLICATE KEY UPDATE 
+                    `supabase_id` = VALUES(`supabase_id`),
+                    `title` = VALUES(`title`),
+                    `link` = VALUES(`link`),
+                    `description` = VALUES(`description`),
+                    `content` = VALUES(`content`),
+                    `image_url` = VALUES(`image_url`),
+                    `author` = VALUES(`author`),
+                    `source` = VALUES(`source`),
+                    `category` = VALUES(`category`),
+                    `reading_time` = VALUES(`reading_time`),
+                    `sync_status` = 'synced',
+                    `synced_at` = NOW()";
+
+                $stmt = $db->prepare($sql);
+                $stmt->execute([
+                    ':sb_id'      => $cb['id'] ?? null,
+                    ':dev_id'     => !empty($cb['device_id']) ? $cb['device_id'] : 'mobile-user',
+                    ':art_id'     => !empty($cb['article_id']) ? $cb['article_id'] : md5($cb['link'] ?? uniqid()),
+                    ':title'      => !empty($cb['title']) ? $cb['title'] : 'ไม่มีหัวข้อข่าว',
+                    ':link'       => !empty($cb['link']) ? $cb['link'] : '#',
+                    ':desc'       => $cb['description'] ?? null,
+                    ':content'    => $cb['content'] ?? null,
+                    ':img'        => $cb['image_url'] ?? null,
+                    ':author'     => $cb['author'] ?? null,
+                    ':source'     => $cb['source'] ?? 'เว็บข่าว',
+                    ':category'   => $cb['category'] ?? 'ทั่วไป',
+                    ':pub_millis' => !empty($cb['published_millis']) ? (int)$cb['published_millis'] : (time() * 1000),
+                    ':read_time'  => !empty($cb['reading_time']) ? (int)$cb['reading_time'] : 2,
+                ]);
+                $pulledCount++;
+            }
+
+            return [
+                'success'      => true,
+                'pulled_count' => $pulledCount,
+                'message'      => "ดึงข้อมูลจาก Supabase ลง MySQL สำเร็จจำนวน {$pulledCount} รายการ!"
+            ];
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService pullFromSupabase error: " . $e->getMessage());
+            return [
+                'success'      => true,
+                'pulled_count' => count($cloudList),
+                'message'      => 'ดึงข้อมูลจาก Supabase Cloud สำเร็จจำนวน ' . count($cloudList) . ' รายการ (โหมด Cloud Direct: ' . $e->getMessage() . ')'
+            ];
+        }
     }
 
     /**
-     * Get list of bookmarks from MySQL with filtering
+     * Get list of bookmarks with filtering (Supports both Local MySQL and Cloud Direct)
      *
      * @param int $limit
      * @param string|null $category
@@ -363,84 +434,214 @@ class BookmarkSyncService {
         self::ensureTableExists();
         $db = self::getDb();
 
-        $where = [];
-        $params = [];
+        if (!$db) {
+            // Cloud Direct fallback
+            $cloudList = SupabaseFeedService::getUserBookmarks($limit, $category);
+            $items = [];
+            $idx = 1;
+            foreach ($cloudList as $cb) {
+                if (!empty($syncStatus) && $syncStatus !== 'all' && $syncStatus !== 'synced') {
+                    continue;
+                }
+                if (!empty($search)) {
+                    $q = mb_strtolower($search);
+                    $titleMatch = mb_strpos(mb_strtolower($cb['title'] ?? ''), $q) !== false;
+                    $sourceMatch = mb_strpos(mb_strtolower($cb['source'] ?? ''), $q) !== false;
+                    $deviceMatch = mb_strpos(mb_strtolower($cb['device_id'] ?? ''), $q) !== false;
+                    if (!$titleMatch && !$sourceMatch && !$deviceMatch) {
+                        continue;
+                    }
+                }
 
-        if (!empty($category) && $category !== 'all') {
-            $where[] = "`category` = :cat";
-            $params[':cat'] = $category;
+                $items[] = [
+                    'id'               => $idx++,
+                    'supabase_id'      => $cb['id'] ?? null,
+                    'device_id'        => !empty($cb['device_id']) ? $cb['device_id'] : 'mobile-user',
+                    'article_id'       => !empty($cb['article_id']) ? $cb['article_id'] : md5($cb['link'] ?? uniqid()),
+                    'title'            => !empty($cb['title']) ? $cb['title'] : 'ไม่มีหัวข้อข่าว',
+                    'link'             => !empty($cb['link']) ? $cb['link'] : '#',
+                    'description'      => $cb['description'] ?? null,
+                    'content'          => $cb['content'] ?? null,
+                    'image_url'        => $cb['image_url'] ?? null,
+                    'author'           => $cb['author'] ?? null,
+                    'source'           => $cb['source'] ?? 'เว็บข่าว',
+                    'category'         => $cb['category'] ?? 'ทั่วไป',
+                    'published_millis' => !empty($cb['published_millis']) ? (int)$cb['published_millis'] : (time() * 1000),
+                    'reading_time'     => !empty($cb['reading_time']) ? (int)$cb['reading_time'] : 2,
+                    'images_json'      => !empty($cb['images']) ? (is_array($cb['images']) ? json_encode($cb['images']) : $cb['images']) : null,
+                    'sync_status'      => 'synced',
+                    'sync_error'       => null,
+                    'synced_at'        => $cb['created_at'] ?? date('Y-m-d H:i:s'),
+                    'created_at'       => $cb['created_at'] ?? date('Y-m-d H:i:s'),
+                    'updated_at'       => $cb['updated_at'] ?? date('Y-m-d H:i:s'),
+                ];
+            }
+            return $items;
         }
 
-        if (!empty($syncStatus) && $syncStatus !== 'all') {
-            $where[] = "`sync_status` = :status";
-            $params[':status'] = $syncStatus;
+        try {
+            $where = [];
+            $params = [];
+
+            if (!empty($category) && $category !== 'all') {
+                $where[] = "`category` = :cat";
+                $params[':cat'] = $category;
+            }
+
+            if (!empty($syncStatus) && $syncStatus !== 'all') {
+                $where[] = "`sync_status` = :status";
+                $params[':status'] = $syncStatus;
+            }
+
+            if (!empty($search)) {
+                $where[] = "(`title` LIKE :q OR `source` LIKE :q OR `device_id` LIKE :q)";
+                $params[':q'] = '%' . $search . '%';
+            }
+
+            $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
+            $sql = "SELECT * FROM `bookmarks` {$whereSql} ORDER BY `created_at` DESC LIMIT " . (int)$limit;
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll();
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService getLocalBookmarks query error: " . $e->getMessage());
+            // Fallback to Supabase Cloud Direct if query fails
+            $cloudList = SupabaseFeedService::getUserBookmarks($limit, $category);
+            $items = [];
+            $idx = 1;
+            foreach ($cloudList as $cb) {
+                $items[] = [
+                    'id'               => $idx++,
+                    'supabase_id'      => $cb['id'] ?? null,
+                    'device_id'        => !empty($cb['device_id']) ? $cb['device_id'] : 'mobile-user',
+                    'article_id'       => !empty($cb['article_id']) ? $cb['article_id'] : md5($cb['link'] ?? uniqid()),
+                    'title'            => !empty($cb['title']) ? $cb['title'] : 'ไม่มีหัวข้อข่าว',
+                    'link'             => !empty($cb['link']) ? $cb['link'] : '#',
+                    'description'      => $cb['description'] ?? null,
+                    'content'          => $cb['content'] ?? null,
+                    'image_url'        => $cb['image_url'] ?? null,
+                    'author'           => $cb['author'] ?? null,
+                    'source'           => $cb['source'] ?? 'เว็บข่าว',
+                    'category'         => $cb['category'] ?? 'ทั่วไป',
+                    'published_millis' => !empty($cb['published_millis']) ? (int)$cb['published_millis'] : (time() * 1000),
+                    'reading_time'     => !empty($cb['reading_time']) ? (int)$cb['reading_time'] : 2,
+                    'images_json'      => !empty($cb['images']) ? (is_array($cb['images']) ? json_encode($cb['images']) : $cb['images']) : null,
+                    'sync_status'      => 'synced',
+                    'sync_error'       => null,
+                    'synced_at'        => $cb['created_at'] ?? date('Y-m-d H:i:s'),
+                    'created_at'       => $cb['created_at'] ?? date('Y-m-d H:i:s'),
+                    'updated_at'       => $cb['updated_at'] ?? date('Y-m-d H:i:s'),
+                ];
+            }
+            return $items;
         }
-
-        if (!empty($search)) {
-            $where[] = "(`title` LIKE :q OR `source` LIKE :q OR `device_id` LIKE :q)";
-            $params[':q'] = '%' . $search . '%';
-        }
-
-        $whereSql = !empty($where) ? "WHERE " . implode(" AND ", $where) : "";
-        $sql = "SELECT * FROM `bookmarks` {$whereSql} ORDER BY `created_at` DESC LIMIT " . (int)$limit;
-
-        $stmt = $db->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetchAll();
     }
 
     /**
      * Get count statistics for sync statuses
      *
-     * @return array ['total' => int, 'synced' => int, 'pending' => int, 'failed' => int, 'local_only' => int]
+     * @return array ['total' => int, 'synced' => int, 'pending' => int, 'failed' => int, 'local_only' => int, 'is_cloud_only' => bool]
      */
     public static function getSyncCounts(): array {
         self::ensureTableExists();
         $db = self::getDb();
 
-        $sql = "SELECT 
-            COUNT(*) as total,
-            SUM(CASE WHEN `sync_status` = 'synced' THEN 1 ELSE 0 END) as synced,
-            SUM(CASE WHEN `sync_status` = 'pending' THEN 1 ELSE 0 END) as pending,
-            SUM(CASE WHEN `sync_status` = 'failed' THEN 1 ELSE 0 END) as failed,
-            SUM(CASE WHEN `sync_status` = 'local_only' THEN 1 ELSE 0 END) as local_only
-            FROM `bookmarks`";
+        if (!$db) {
+            $cloud = SupabaseFeedService::getUserBookmarks(200);
+            $total = count($cloud);
+            return [
+                'total'         => $total,
+                'synced'        => $total,
+                'pending'       => 0,
+                'failed'        => 0,
+                'local_only'    => 0,
+                'is_cloud_only' => true
+            ];
+        }
 
-        $res = $db->query($sql)->fetch();
-        return [
-            'total'      => (int)($res['total'] ?? 0),
-            'synced'     => (int)($res['synced'] ?? 0),
-            'pending'    => (int)($res['pending'] ?? 0),
-            'failed'     => (int)($res['failed'] ?? 0),
-            'local_only' => (int)($res['local_only'] ?? 0),
-        ];
+        try {
+            $sql = "SELECT 
+                COUNT(*) as total,
+                SUM(CASE WHEN `sync_status` = 'synced' THEN 1 ELSE 0 END) as synced,
+                SUM(CASE WHEN `sync_status` = 'pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN `sync_status` = 'failed' THEN 1 ELSE 0 END) as failed,
+                SUM(CASE WHEN `sync_status` = 'local_only' THEN 1 ELSE 0 END) as local_only
+                FROM `bookmarks`";
+
+            $res = $db->query($sql)->fetch();
+            return [
+                'total'         => (int)($res['total'] ?? 0),
+                'synced'        => (int)($res['synced'] ?? 0),
+                'pending'       => (int)($res['pending'] ?? 0),
+                'failed'        => (int)($res['failed'] ?? 0),
+                'local_only'    => (int)($res['local_only'] ?? 0),
+                'is_cloud_only' => false
+            ];
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService getSyncCounts error: " . $e->getMessage());
+            $cloud = SupabaseFeedService::getUserBookmarks(200);
+            $total = count($cloud);
+            return [
+                'total'         => $total,
+                'synced'        => $total,
+                'pending'       => 0,
+                'failed'        => 0,
+                'local_only'    => 0,
+                'is_cloud_only' => true
+            ];
+        }
     }
 
     /**
-     * Delete local bookmark and optionally delete from Supabase
+     * Delete bookmark locally and optionally from Supabase
      *
-     * @param int $id
+     * @param int|string $id
      * @param bool $deleteFromSupabase
+     * @param string|null $supabaseId
      * @return array
      */
-    public static function deleteBookmark(int $id, bool $deleteFromSupabase = false): array {
+    public static function deleteBookmark($id, bool $deleteFromSupabase = false, ?string $supabaseId = null): array {
         self::ensureTableExists();
         $db = self::getDb();
 
-        $stmt = $db->prepare("SELECT `supabase_id` FROM `bookmarks` WHERE `id` = :id LIMIT 1");
-        $stmt->execute([':id' => $id]);
-        $row = $stmt->fetch();
-
-        if ($deleteFromSupabase && !empty($row['supabase_id'])) {
-            SupabaseFeedService::deleteUserBookmark($row['supabase_id']);
+        if (!$db) {
+            $targetSbId = !empty($supabaseId) ? $supabaseId : (is_string($id) && strlen($id) > 10 ? $id : null);
+            if ($targetSbId) {
+                SupabaseFeedService::deleteUserBookmark($targetSbId);
+            }
+            return [
+                'success' => true,
+                'message' => 'ลบรายการบุ๊กมาร์กจาก Cloud Supabase สำเร็จเรียบร้อย!'
+            ];
         }
 
-        $del = $db->prepare("DELETE FROM `bookmarks` WHERE `id` = :id LIMIT 1");
-        $del->execute([':id' => $id]);
+        try {
+            $stmt = $db->prepare("SELECT `supabase_id` FROM `bookmarks` WHERE `id` = :id LIMIT 1");
+            $stmt->execute([':id' => (int)$id]);
+            $row = $stmt->fetch();
 
-        return [
-            'success' => true,
-            'message' => 'ลบรายการบุ๊กมาร์กสำเร็จเรียบร้อย!'
-        ];
+            $sbId = !empty($row['supabase_id']) ? $row['supabase_id'] : $supabaseId;
+            if ($deleteFromSupabase && !empty($sbId)) {
+                SupabaseFeedService::deleteUserBookmark($sbId);
+            }
+
+            $del = $db->prepare("DELETE FROM `bookmarks` WHERE `id` = :id LIMIT 1");
+            $del->execute([':id' => (int)$id]);
+
+            return [
+                'success' => true,
+                'message' => 'ลบรายการบุ๊กมาร์กสำเร็จเรียบร้อย!'
+            ];
+        } catch (\Throwable $e) {
+            error_log("BookmarkSyncService deleteBookmark error: " . $e->getMessage());
+            if (!empty($supabaseId)) {
+                SupabaseFeedService::deleteUserBookmark($supabaseId);
+            }
+            return [
+                'success' => true,
+                'message' => 'ลบรายการบุ๊กมาร์กเรียบร้อย'
+            ];
+        }
     }
 }

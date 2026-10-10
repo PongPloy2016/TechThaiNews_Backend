@@ -474,68 +474,78 @@ class Admin extends ADMIN_Controller {
             return;
         }
 
-        $homeDir = FCPATH . 'home/';
-        if (file_exists($homeDir . 'config.php')) {
-            require_once $homeDir . 'config.php';
-            require_once $homeDir . 'SupabaseFeedService.php';
-            require_once $homeDir . 'BookmarkSyncService.php';
+        $data = array();
+        $data['bookmarks'] = [];
+        $data['sync_counts'] = ['total' => 0, 'synced' => 0, 'pending' => 0, 'failed' => 0, 'local_only' => 0, 'is_cloud_only' => false];
+        $data['selected_category'] = 'all';
+        $data['selected_status'] = 'all';
 
-            // 1. AJAX Sync Single Bookmark to Supabase
-            $action = $this->input->get_post('action');
-            if ($action === 'sync_single') {
-                $id = (int)$this->input->get_post('id');
-                $res = BookmarkSyncService::syncSingleToSupabase($id);
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode($res);
-                return;
-            }
+        try {
+            $homeDir = FCPATH . 'home/';
+            if (file_exists($homeDir . 'config.php')) {
+                require_once $homeDir . 'config.php';
+                require_once $homeDir . 'SupabaseFeedService.php';
+                require_once $homeDir . 'BookmarkSyncService.php';
 
-            // 2. Action: Sync All Pending Bookmarks to Supabase
-            if ($this->input->post('sync_pending')) {
-                $res = BookmarkSyncService::syncPendingToSupabase();
-                $this->session->set_flashdata($res['success'] ? 'success' : 'error', $res['message']);
-                redirect(admin_url("bookmarks"));
-                return;
-            }
+                // 1. AJAX Sync Single Bookmark to Supabase
+                $action = $this->input->get_post('action');
+                if ($action === 'sync_single') {
+                    $id = (int)$this->input->get_post('id');
+                    $res = BookmarkSyncService::syncSingleToSupabase($id);
+                    header('Content-Type: application/json; charset=utf-8');
+                    echo json_encode($res);
+                    return;
+                }
 
-            // 3. Action: Pull all Bookmarks from Supabase Cloud to MySQL
-            if ($this->input->post('pull_supabase')) {
-                $res = BookmarkSyncService::pullFromSupabase(200);
-                $this->session->set_flashdata($res['success'] ? 'success' : 'error', $res['message']);
-                redirect(admin_url("bookmarks"));
-                return;
-            }
+                // 2. Action: Sync All Pending Bookmarks to Supabase
+                if ($this->input->post('sync_pending')) {
+                    $res = BookmarkSyncService::syncPendingToSupabase();
+                    $this->session->set_flashdata($res['success'] ? 'success' : 'error', $res['message']);
+                    redirect(admin_url("bookmarks"));
+                    return;
+                }
 
-            // 4. Action: Delete Bookmark (Local & optional Supabase)
-            if ($this->input->post('delete_bookmark')) {
-                $id = (int)$this->input->post('bookmark_id');
-                $deleteCloud = !empty($this->input->post('delete_cloud'));
-                $res = BookmarkSyncService::deleteBookmark($id, $deleteCloud);
-                $this->session->set_flashdata($res['success'] ? 'success' : 'error', $res['message']);
-                redirect(admin_url("bookmarks"));
-                return;
-            }
+                // 3. Action: Pull all Bookmarks from Supabase Cloud to MySQL
+                if ($this->input->post('pull_supabase')) {
+                    $res = BookmarkSyncService::pullFromSupabase(200);
+                    $this->session->set_flashdata($res['success'] ? 'success' : 'error', $res['message']);
+                    redirect(admin_url("bookmarks"));
+                    return;
+                }
 
-            $selectedCategory = $this->input->get('category') ?: 'all';
-            $selectedStatus   = $this->input->get('sync_status') ?: 'all';
-            $searchQuery      = $this->input->get('q') ?: null;
+                // 4. Action: Delete Bookmark (Local & optional Supabase)
+                if ($this->input->post('delete_bookmark')) {
+                    $id = $this->input->post('bookmark_id');
+                    $supabaseId = $this->input->post('supabase_id');
+                    $deleteCloud = !empty($this->input->post('delete_cloud'));
+                    $res = BookmarkSyncService::deleteBookmark($id, $deleteCloud, $supabaseId);
+                    $this->session->set_flashdata($res['success'] ? 'success' : 'error', $res['message']);
+                    redirect(admin_url("bookmarks"));
+                    return;
+                }
 
-            // Check if local table has records; if 0, auto-pull from Supabase on first run
-            $syncCounts = BookmarkSyncService::getSyncCounts();
-            if ($syncCounts['total'] === 0) {
-                BookmarkSyncService::pullFromSupabase(100);
+                $selectedCategory = $this->input->get('category') ?: 'all';
+                $selectedStatus   = $this->input->get('sync_status') ?: 'all';
+                $searchQuery      = $this->input->get('q') ?: null;
+
+                // Check if local table has records; if 0 and MySQL is active, auto-pull from Supabase on first run
                 $syncCounts = BookmarkSyncService::getSyncCounts();
-            }
+                if ($syncCounts['total'] === 0 && empty($syncCounts['is_cloud_only'])) {
+                    BookmarkSyncService::pullFromSupabase(100);
+                    $syncCounts = BookmarkSyncService::getSyncCounts();
+                }
 
-            $data['bookmarks'] = BookmarkSyncService::getLocalBookmarks(200, $selectedCategory, $selectedStatus, $searchQuery);
-            $data['sync_counts'] = $syncCounts;
-            $data['selected_category'] = $selectedCategory;
-            $data['selected_status'] = $selectedStatus;
-        } else {
-            $data['bookmarks'] = [];
-            $data['sync_counts'] = ['total' => 0, 'synced' => 0, 'pending' => 0, 'failed' => 0, 'local_only' => 0];
-            $data['selected_category'] = 'all';
-            $data['selected_status'] = 'all';
+                $data['bookmarks'] = BookmarkSyncService::getLocalBookmarks(200, $selectedCategory, $selectedStatus, $searchQuery);
+                $data['sync_counts'] = $syncCounts;
+                $data['selected_category'] = $selectedCategory;
+                $data['selected_status'] = $selectedStatus;
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'Error in Admin bookmarks: ' . $e->getMessage());
+            if (class_exists('BookmarkSyncService')) {
+                $data['bookmarks'] = BookmarkSyncService::getLocalBookmarks(200);
+                $data['sync_counts'] = BookmarkSyncService::getSyncCounts();
+            }
         }
 
         $data['title'] = _lang("User Bookmarks & Sync Manager (MySQL + Supabase)");
