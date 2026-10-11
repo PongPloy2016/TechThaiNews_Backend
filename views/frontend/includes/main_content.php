@@ -162,7 +162,7 @@ $isAllMode = ($currentGroupKey === 'all' && !empty($articlesByGroup));
                     <div class="col-12 col-sm-6 col-lg-3">
                         <article class="category-news-card">
                             <a href="news_detail.php?id=<?php echo urlencode($art['id']); ?>&group=<?php echo urlencode($gKey); ?>" class="cat-card-media d-block position-relative text-decoration-none">
-                                <img src="<?php echo htmlspecialchars($thumb); ?>" alt="<?php echo htmlspecialchars($art['title']); ?>" class="cat-card-img" loading="lazy">
+                                <img src="<?php echo htmlspecialchars($thumb); ?>" alt="<?php echo htmlspecialchars($art['title']); ?>" class="cat-card-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1000&auto=format&fit=crop&q=80';">
                                 <!-- Floating Vibrant Category Pill on Image (matching reference photo) -->
                                 <span class="cat-card-pill" style="background-color: <?php echo $meta['color']; ?>;">
                                     <?php echo htmlspecialchars($meta['badge']); ?>
@@ -211,7 +211,7 @@ $isAllMode = ($currentGroupKey === 'all' && !empty($articlesByGroup));
                         <div class="trending-row">
                             <span class="trending-rank-num"><?php echo $rankStr; ?></span>
                             <a href="news_detail.php?id=<?php echo urlencode($tr['id']); ?>&group=<?php echo urlencode($tr['group_key'] ?? $currentGroupKey); ?>" class="d-block flex-shrink-0">
-                                <img src="<?php echo htmlspecialchars($trThumb); ?>" alt="<?php echo htmlspecialchars($tr['title']); ?>" class="trending-row-thumb" loading="lazy">
+                                <img src="<?php echo htmlspecialchars($trThumb); ?>" alt="<?php echo htmlspecialchars($tr['title']); ?>" class="trending-row-thumb" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80';">
                             </a>
                             <div class="flex-grow-1 min-w-0">
                                 <a href="news_detail.php?id=<?php echo urlencode($tr['id']); ?>&group=<?php echo urlencode($tr['group_key'] ?? $currentGroupKey); ?>" class="trending-row-title">
@@ -343,7 +343,7 @@ $isAllMode = ($currentGroupKey === 'all' && !empty($articlesByGroup));
                         <div class="col-12 col-md-6 article-grid-item" data-source="<?php echo htmlspecialchars($art['source_key']); ?>" data-group="<?php echo htmlspecialchars($artGroupKey); ?>" data-title="<?php echo htmlspecialchars(mb_strtolower($art['title'])); ?>">
                             <article class="article-feed-card">
                                 <a href="news_detail.php?id=<?php echo urlencode($art['id']); ?>&group=<?php echo urlencode($artGroupKey); ?>" class="feed-card-media d-block text-decoration-none position-relative">
-                                    <img src="<?php echo htmlspecialchars($thumb); ?>" alt="<?php echo htmlspecialchars($art['title']); ?>" class="feed-card-img" loading="lazy">
+                                    <img src="<?php echo htmlspecialchars($thumb); ?>" alt="<?php echo htmlspecialchars($art['title']); ?>" class="feed-card-img" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1000&auto=format&fit=crop&q=80';">
                                     <span class="feed-card-badge" style="background-color: <?php echo $badgeColor; ?>;">
                                         <?php echo htmlspecialchars($art['source_label']); ?>
                                     </span>
@@ -416,7 +416,7 @@ $isAllMode = ($currentGroupKey === 'all' && !empty($articlesByGroup));
                         <div class="trending-row">
                             <span class="trending-rank-num"><?php echo $rankStr; ?></span>
                             <a href="news_detail.php?id=<?php echo urlencode($tr['id']); ?>&group=<?php echo urlencode($tr['group_key'] ?? $currentGroupKey); ?>" class="d-block flex-shrink-0">
-                                <img src="<?php echo htmlspecialchars($trThumb); ?>" alt="<?php echo htmlspecialchars($tr['title']); ?>" class="trending-row-thumb" loading="lazy">
+                                <img src="<?php echo htmlspecialchars($trThumb); ?>" alt="<?php echo htmlspecialchars($tr['title']); ?>" class="trending-row-thumb" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80';">
                             </a>
                             <div class="flex-grow-1 min-w-0">
                                 <a href="news_detail.php?id=<?php echo urlencode($tr['id']); ?>&group=<?php echo urlencode($tr['group_key'] ?? $currentGroupKey); ?>" class="trending-row-title">

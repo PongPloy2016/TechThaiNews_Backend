@@ -23,7 +23,7 @@ $nextSourceOrder = count($sourcesInGroup ?? []) + 1;
             </div>
             <div class="modal-body p-4">
                 <div id="readerImageContainer" class="mb-4 rounded overflow-hidden position-relative" style="max-height: 400px; border-radius: var(--radius-md);">
-                    <img id="readerImage" src="" alt="Article cover" class="w-100 h-100" style="object-fit: cover;">
+                    <img id="readerImage" src="" alt="Article cover" class="w-100 h-100" style="object-fit: cover;" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1000&auto=format&fit=crop&q=80';">
                 </div>
 
                 <h2 class="fw-bold mb-3" id="readerTitle" style="font-size: 1.5rem; line-height: 1.35; letter-spacing: -0.025em;"></h2>

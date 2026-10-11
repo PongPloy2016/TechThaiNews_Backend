@@ -441,7 +441,7 @@ $currentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" 
 
                         <!-- Feature Cover Image -->
                         <div class="article-feature-image-container">
-                            <img src="<?php echo htmlspecialchars($articleThumb); ?>" alt="<?php echo htmlspecialchars($article['title']); ?>" class="article-feature-img" loading="eager">
+                            <img src="<?php echo htmlspecialchars($articleThumb); ?>" alt="<?php echo htmlspecialchars($article['title']); ?>" class="article-feature-img" loading="eager" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1000&auto=format&fit=crop&q=80';">
                             <div class="article-img-caption">
                                 <span><i class="bi bi-image me-1"></i> ภาพประกอบจากสำนักข่าว: <?php echo htmlspecialchars($article['source_label']); ?></span>
                                 <span class="font-monospace">TechThaiNews Live Dispatch</span>
@@ -576,7 +576,7 @@ $currentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" 
                                     <div class="col-12 col-sm-6 col-md-3">
                                         <div class="related-story-card">
                                             <a href="news_detail.php?id=<?php echo urlencode($relArt['id']); ?>&group=<?php echo urlencode($currentGroupKey); ?>">
-                                                <img src="<?php echo htmlspecialchars($relThumb); ?>" alt="<?php echo htmlspecialchars($relArt['title']); ?>" class="related-story-thumb" loading="lazy">
+                                                <img src="<?php echo htmlspecialchars($relThumb); ?>" alt="<?php echo htmlspecialchars($relArt['title']); ?>" class="related-story-thumb" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1000&auto=format&fit=crop&q=80';">
                                             </a>
                                             <div class="related-story-body">
                                                 <div class="mb-2">
@@ -629,7 +629,7 @@ $currentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" 
                             ?>
                                 <div class="trending-row">
                                     <span class="trending-rank-num"><?php echo $rankStr; ?></span>
-                                    <img src="<?php echo htmlspecialchars($trThumb); ?>" alt="<?php echo htmlspecialchars($tr['title']); ?>" class="trending-row-thumb" loading="lazy">
+                                    <img src="<?php echo htmlspecialchars($trThumb); ?>" alt="<?php echo htmlspecialchars($tr['title']); ?>" class="trending-row-thumb" loading="lazy" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1518770660439-4636190af475?w=500&auto=format&fit=crop&q=80';">
                                     <div class="flex-grow-1 min-w-0">
                                         <a href="news_detail.php?id=<?php echo urlencode($tr['id']); ?>&group=<?php echo urlencode($currentGroupKey); ?>" class="trending-row-title">
                                             <?php echo htmlspecialchars($tr['title']); ?>

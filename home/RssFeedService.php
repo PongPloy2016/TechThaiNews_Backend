@@ -741,6 +741,9 @@ class RssFeedService {
             $art['pub_date_thai']     = self::formatThaiDate($ts);
             $art['pub_time_thai']     = self::formatThaiTime($ts);
             $art['pub_datetime_thai'] = $art['time_ago'];
+            if (!empty($art['image'])) {
+                $art['image'] = self::formatSafeImageUrl($art['image']);
+            }
         }
         unset($art);
         return $articles;
@@ -810,11 +813,37 @@ class RssFeedService {
     }
 
     /**
+     * Format image URL safely:
+     * - Fixes YouTube embed URLs into real video thumbnails
+     * - Fixes blocked CORS/CORP same-origin images (e.g. thestandard.co) using fast CDN proxy
+     */
+    public static function formatSafeImageUrl($url) {
+        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+            return '';
+        }
+
+        // Fix YouTube embed links
+        if (strpos($url, 'youtube.com/embed/') !== false) {
+            if (preg_match('#youtube\.com/embed/([^/?&]+)#', $url, $m)) {
+                return 'https://img.youtube.com/vi/' . $m[1] . '/hqdefault.jpg';
+            }
+        }
+
+        // Publishers enforcing CORP same-origin or hotlink blocking
+        $host = parse_url($url, PHP_URL_HOST);
+        if ($host && preg_match('/(thestandard\.co|khaosod\.co\.th|matichon\.co\.th|thaipost\.net)/i', $host)) {
+            return 'https://wsrv.nl/?url=' . urlencode($url) . '&w=1000&q=82';
+        }
+
+        return $url;
+    }
+
+    /**
      * Get best thumbnail for an article with intelligent contextual matching
      */
     public static function getThumbnail($article, $fallbackIndex = 0) {
         if (!empty($article['image']) && filter_var($article['image'], FILTER_VALIDATE_URL)) {
-            return $article['image'];
+            return self::formatSafeImageUrl($article['image']);
         }
 
         $text = mb_strtolower(($article['title'] ?? '') . ' ' . ($article['description'] ?? ''), 'UTF-8');
@@ -846,7 +875,7 @@ class RssFeedService {
 
         // 6. SpaceX / Satellite
         if (preg_match('/(spacex|ดาวเทียม|starlink|อวกาศ|จรวด|nasa|คลื่นความถี่)/i', $text)) {
-            return 'https://images.unsplash.com/photo-1517976487504-59a1a0841246?w=1000&auto=format&fit=crop&q=80';
+            return 'https://images.unsplash.com/photo-1516849841032-87cbac4d88f7?w=1000&auto=format&fit=crop&q=80';
         }
 
         // 7. EV / Car
@@ -856,7 +885,7 @@ class RssFeedService {
 
         // 8. AI
         if (preg_match('/(ai|ปัญญาประดิษฐ์|gemini|chatgpt|openai|โมเดล|deepseek|llm|copilot)/i', $text)) {
-            return 'https://images.unsplash.com/photo-1677442136019-21780efad99a?w=1000&auto=format&fit=crop&q=80';
+            return 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=1000&auto=format&fit=crop&q=80';
         }
 
         // 9. Crypto
