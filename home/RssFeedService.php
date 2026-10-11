@@ -32,8 +32,9 @@ class RssFeedService {
 
         $cacheFile = self::$cacheDir . '/rss_' . $safeGroupKey . '.json';
 
-        // Return from cache immediately if exists (zero latency)
-        if (!$forceRefresh && file_exists($cacheFile)) {
+        // Return from cache if fresh (within cacheTtl) and not forced refresh
+        $isFresh = file_exists($cacheFile) && (time() - filemtime($cacheFile) < self::$cacheTtl);
+        if (!$forceRefresh && $isFresh) {
             $content = @file_get_contents($cacheFile);
             $cached = $content ? json_decode($content, true) : null;
             if (is_array($cached) && !empty($cached)) {
@@ -117,8 +118,9 @@ class RssFeedService {
 
         $cacheFile = self::$cacheDir . '/rss_all_aggregated.json';
 
-        // Return from cache immediately if exists (zero latency)
-        if (!$forceRefresh && file_exists($cacheFile)) {
+        // Return from cache if fresh (within cacheTtl) and not forced refresh
+        $isFresh = file_exists($cacheFile) && (time() - filemtime($cacheFile) < self::$cacheTtl);
+        if (!$forceRefresh && $isFresh) {
             $content = @file_get_contents($cacheFile);
             $cached = $content ? json_decode($content, true) : null;
             if (is_array($cached) && !empty($cached)) {
@@ -137,8 +139,8 @@ class RssFeedService {
         foreach ($groups as $g) {
             $gKey = $g['key'];
             $gLabel = $g['label'];
-            // Read group articles (reads group cache if present)
-            $groupArts = self::getGroupArticles($gKey, false, 2);
+            // Read group articles (reads group cache if fresh, or re-fetches if forceRefresh or expired)
+            $groupArts = self::getGroupArticles($gKey, $forceRefresh, 2);
             if (!empty($groupArts)) {
                 $slice = array_slice($groupArts, 0, 8);
                 foreach ($slice as $art) {
