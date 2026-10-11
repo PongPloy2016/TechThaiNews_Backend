@@ -410,17 +410,45 @@ class Admin extends ADMIN_Controller {
                 }));
             }
 
-            $data['sources'] = $allSources;
+            // Pagination settings (10 items per page)
+            $perPage = 10;
+            $currentPage = max(1, (int)($this->input->get('page') ?: 1));
+            $totalSources = count($allSources);
+            $totalPages = max(1, (int)ceil($totalSources / $perPage));
+            if ($currentPage > $totalPages && $totalPages > 0) {
+                $currentPage = $totalPages;
+            }
+            $offset = ($currentPage - 1) * $perPage;
+
+            // Overall active & inactive counts for current filter before slicing
+            $activeCount = count(array_filter($allSources, function($s) { return !empty($s['is_active']); }));
+            $inactiveCount = $totalSources - $activeCount;
+
+            $paginatedSources = array_slice($allSources, $offset, $perPage);
+
+            $data['sources'] = $paginatedSources;
             $data['groups'] = SupabaseFeedService::getFeedGroups(false);
             $data['selected_group'] = $selectedGroup;
             $data['selected_status'] = $selectedStatus;
             $data['search_query'] = $searchQuery;
+            $data['current_page'] = $currentPage;
+            $data['per_page'] = $perPage;
+            $data['total_items'] = $totalSources;
+            $data['total_pages'] = $totalPages;
+            $data['active_count'] = $activeCount;
+            $data['inactive_count'] = $inactiveCount;
         } else {
             $data['sources'] = [];
             $data['groups'] = [];
             $data['selected_group'] = 'all';
             $data['selected_status'] = 'all';
             $data['search_query'] = '';
+            $data['current_page'] = 1;
+            $data['per_page'] = 10;
+            $data['total_items'] = 0;
+            $data['total_pages'] = 1;
+            $data['active_count'] = 0;
+            $data['inactive_count'] = 0;
         }
 
         $data['title'] = _lang("Manage Feed Sources (Supabase)");

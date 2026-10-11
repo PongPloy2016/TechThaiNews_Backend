@@ -10,17 +10,46 @@ $selGroup = $selected_group ?? 'all';
 $selStatus = $selected_status ?? 'all';
 $searchQ = $search_query ?? '';
 
+$currentPage  = isset($current_page) ? max(1, (int)$current_page) : 1;
+$perPage      = isset($per_page) ? (int)$per_page : 10;
+$totalItems   = isset($total_items) ? (int)$total_items : count($allSources);
+$totalPages   = isset($total_pages) ? max(1, (int)$total_pages) : max(1, (int)ceil($totalItems / $perPage));
+
+$startItem    = $totalItems > 0 ? (($currentPage - 1) * $perPage) + 1 : 0;
+$endItem      = min($totalItems, $currentPage * $perPage);
+
 // Build group lookup map
 $groupMap = [];
 foreach ($allGroups as $g) {
     $groupMap[$g['key']] = $g;
 }
 
-$activeCount = 0;
-foreach ($allSources as $s) {
-    if (!empty($s['is_active'])) $activeCount++;
+$activeCount = isset($active_count) ? (int)$active_count : 0;
+$inactiveCount = isset($inactive_count) ? (int)$inactive_count : 0;
+if (!isset($active_count)) {
+    foreach ($allSources as $s) {
+        if (!empty($s['is_active'])) $activeCount++;
+    }
+    $inactiveCount = count($allSources) - $activeCount;
 }
-$inactiveCount = count($allSources) - $activeCount;
+
+// Helper to construct pagination URLs while preserving current filters & search
+$buildPageUrl = function($pageNum) use ($selGroup, $selStatus, $searchQ) {
+    $params = [];
+    if ($pageNum > 1) {
+        $params['page'] = $pageNum;
+    }
+    if (!empty($selGroup) && $selGroup !== 'all') {
+        $params['group'] = $selGroup;
+    }
+    if (!empty($selStatus) && $selStatus !== 'all') {
+        $params['status'] = $selStatus;
+    }
+    if (!empty($searchQ)) {
+        $params['q'] = $searchQ;
+    }
+    return admin_url("feed_sources" . (!empty($params) ? '?' . http_build_query($params) : ''));
+};
 ?>
 
 <style>
@@ -235,6 +264,124 @@ input:checked + .fs-slider:before {
     gap: 6px;
     white-space: nowrap;
 }
+
+/* 📄 Pagination Bar & Next Page Controls */
+.fs-pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 22px;
+    background: #f8fafc;
+    border-top: 1px solid var(--fs-border);
+    flex-wrap: wrap;
+    gap: 14px;
+}
+.fs-pagination-info {
+    font-size: 13px;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.fs-pagination-info strong {
+    color: #0f172a;
+    font-weight: 700;
+}
+.fs-page-tag {
+    background: #e2e8f0;
+    color: #334155;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.fs-limit-tag {
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 3px 9px;
+    border-radius: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.fs-pagination-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.fs-page-item {
+    margin: 0;
+    list-style: none;
+}
+.fs-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 9px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none !important;
+    transition: all 0.15s ease-in-out;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.fs-page-btn:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #0f172a;
+    transform: translateY(-1px);
+}
+.fs-page-btn-nav {
+    padding: 0 12px;
+    font-weight: 600;
+}
+.fs-page-btn-next {
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%) !important;
+    color: #ffffff !important;
+    border-color: #1e40af !important;
+    font-weight: 700 !important;
+    padding: 0 16px !important;
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3) !important;
+}
+.fs-page-btn-next:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%) !important;
+    box-shadow: 0 5px 14px rgba(37, 99, 235, 0.4) !important;
+}
+.fs-page-item.active .fs-page-btn {
+    background: #2563eb !important;
+    color: #ffffff !important;
+    border-color: #2563eb !important;
+    font-weight: 800;
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35);
+}
+.fs-page-item.disabled .fs-page-btn {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #94a3b8 !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+    pointer-events: none;
+    opacity: 0.6;
+}
+.fs-page-dots {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 36px;
+    color: #94a3b8;
+    font-weight: 700;
+}
 </style>
 
 <!-- Content Wrapper -->
@@ -336,7 +483,15 @@ input:checked + .fs-slider:before {
                 <div>
                     <h3 class="fs-card-title">
                         <i class="mdi mdi-rss" style="color: #2563eb;"></i>
-                        รายการแหล่งข่าวสารทั้งหมด (<?= count($allSources) ?> รายการ)
+                        รายการแหล่งข่าวสารทั้งหมด (<?= number_format($totalItems) ?> รายการ)
+                        <span class="badge" style="background: #e0e7ff; color: #1e40af; font-size: 12px; font-weight: 700; margin-left: 6px;">
+                            แสดง <?= $startItem ?> - <?= $endItem ?> จาก <?= number_format($totalItems) ?> (หน้า <?= $currentPage ?> / <?= $totalPages ?>)
+                        </span>
+                        <?php if (!empty($searchQ)): ?>
+                        <span class="badge" style="background: #fef3c7; color: #92400e; font-size: 11.5px; font-weight: 600; margin-left: 4px;">
+                            <i class="fa fa-search"></i> คำค้น: "<?= htmlspecialchars($searchQ) ?>"
+                        </span>
+                        <?php endif; ?>
                     </h3>
                     <p style="margin: 3px 0 0 0; font-size: 12.5px; color: #64748b;">
                         คลิกที่สวิตช์ในคอลัมน์ <strong>เปิด/ปิด</strong> เพื่อเปิดหรือระงับการดึงฟีดข่าวจากสำนักข่าวนั้นแบบเรียลไทม์
@@ -480,6 +635,86 @@ input:checked + .fs-slider:before {
                     </tbody>
                 </table>
             </div>
+
+            <!-- 📄 Pagination Bar (โหลดทีละ 10 รายการ พร้อมปุ่ม Next Page) -->
+            <?php if ($totalPages > 1 || $totalItems > 0): ?>
+            <div class="fs-pagination-bar">
+                <div class="fs-pagination-info">
+                    กำลังแสดงรายการที่ <strong><?= $startItem ?></strong> - <strong><?= $endItem ?></strong> จากทั้งหมด <strong><?= number_format($totalItems) ?></strong> รายการ
+                    <span class="fs-page-tag">หน้า <?= $currentPage ?> / <?= $totalPages ?></span>
+                    <span class="fs-limit-tag"><i class="fa fa-list-ol"></i> <?= $perPage ?> รายการ / หน้า</span>
+                </div>
+
+                <?php if ($totalPages > 1): ?>
+                <ul class="fs-pagination-nav">
+                    <!-- หน้าแรก -->
+                    <li class="fs-page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                        <a href="<?= $currentPage > 1 ? $buildPageUrl(1) : 'javascript:void(0)' ?>" class="fs-page-btn" title="หน้าแรก (หน้า 1)">
+                            <i class="fa fa-angle-double-left"></i>
+                        </a>
+                    </li>
+
+                    <!-- ก่อนหน้า (Previous) -->
+                    <li class="fs-page-item <?= $currentPage <= 1 ? 'disabled' : '' ?>">
+                        <a href="<?= $currentPage > 1 ? $buildPageUrl($currentPage - 1) : 'javascript:void(0)' ?>" class="fs-page-btn fs-page-btn-nav" title="หน้าก่อนหน้า">
+                            <i class="fa fa-angle-left"></i> ก่อนหน้า
+                        </a>
+                    </li>
+
+                    <!-- ตัวเลขหน้า (Windowed Page Numbers) -->
+                    <?php
+                    $startPage = max(1, $currentPage - 2);
+                    $endPage   = min($totalPages, $currentPage + 2);
+                    if ($currentPage <= 3) {
+                        $endPage = min($totalPages, 5);
+                    }
+                    if ($currentPage >= $totalPages - 2) {
+                        $startPage = max(1, $totalPages - 4);
+                    }
+
+                    if ($startPage > 1): ?>
+                        <li class="fs-page-item">
+                            <a href="<?= $buildPageUrl(1) ?>" class="fs-page-btn">1</a>
+                        </li>
+                        <?php if ($startPage > 2): ?>
+                            <li class="fs-page-item disabled"><span class="fs-page-dots">…</span></li>
+                        <?php endif; ?>
+                    <?php endif; ?>
+
+                    <?php for ($p = $startPage; $p <= $endPage; $p++): ?>
+                        <li class="fs-page-item <?= $p === $currentPage ? 'active' : '' ?>">
+                            <a href="<?= $p === $currentPage ? 'javascript:void(0)' : $buildPageUrl($p) ?>" class="fs-page-btn">
+                                <?= $p ?>
+                            </a>
+                        </li>
+                    <?php endfor; ?>
+
+                    <?php if ($endPage < $totalPages): ?>
+                        <?php if ($endPage < $totalPages - 1): ?>
+                            <li class="fs-page-item disabled"><span class="fs-page-dots">…</span></li>
+                        <?php endif; ?>
+                        <li class="fs-page-item">
+                            <a href="<?= $buildPageUrl($totalPages) ?>" class="fs-page-btn"><?= $totalPages ?></a>
+                        </li>
+                    <?php endif; ?>
+
+                    <!-- ถัดไป (Next Page) -->
+                    <li class="fs-page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                        <a href="<?= $currentPage < $totalPages ? $buildPageUrl($currentPage + 1) : 'javascript:void(0)' ?>" class="fs-page-btn fs-page-btn-next" title="หน้าถัดไป">
+                            ถัดไป (Next) <i class="fa fa-angle-right"></i>
+                        </a>
+                    </li>
+
+                    <!-- หน้าสุดท้าย -->
+                    <li class="fs-page-item <?= $currentPage >= $totalPages ? 'disabled' : '' ?>">
+                        <a href="<?= $currentPage < $totalPages ? $buildPageUrl($totalPages) : 'javascript:void(0)' ?>" class="fs-page-btn" title="หน้าสุดท้าย">
+                            <i class="fa fa-angle-double-right"></i>
+                        </a>
+                    </li>
+                </ul>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         </div>
 
         <!-- 🛠️ Supabase SQL DDL Guide Card -->
