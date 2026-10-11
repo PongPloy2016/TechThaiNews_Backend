@@ -123,13 +123,16 @@ $isSystemActive   = in_array($currentPage, ["theme_settings", "cache_manager", "
 
     $adminMenu = AdminTemplateManager::loadMenu(FALSE, "menu");
     $adminMenu2 = AdminTemplateManager::loadMenu(FALSE, "Admin");
-    $clientMenu = AdminTemplateManager::loadMenu(FALSE, "Client");
-
+    // In TechThaiNews, legacy client menus (My tickets, My bookings, Messages, Payment) are hidden
+    $showLegacyTourismMenus = false;
+    if ($showLegacyTourismMenus) {
+        $clientMenu = AdminTemplateManager::loadMenu(FALSE, "Client");
         if (!empty($clientMenu)) {
             foreach ($clientMenu as $menu) {
                 $safeLoadView($menu['path']);
             }
         }
+    }
 
 
 
