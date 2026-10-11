@@ -8,7 +8,7 @@ $uri_child = $this->uri->segment(4);
 $currentPage = $uri_m ?: '';
 $isDashboardActive = ($currentPage === '' || $currentPage === 'index' || $currentPage === 'home');
 
-$isNewsActive     = in_array($currentPage, ["feed_groups", "feed_sources", "broadcast"]);
+$isNewsActive     = in_array($currentPage, ["feed_groups", "feed_sources", "bookmarks", "broadcast"]);
 $isAudienceActive = in_array($currentPage, ["bookmarks", "feedbacks"]);
 $isSystemActive   = in_array($currentPage, ["theme_settings", "cache_manager", "app_settings"]);
 ?>
@@ -43,6 +43,9 @@ $isSystemActive   = in_array($currentPage, ["theme_settings", "cache_manager", "
             </li>
             <li class="<?= $currentPage == "feed_sources" ? 'active' : '' ?>">
                 <a href="<?= admin_url("feed_sources") ?>"><i class="mdi mdi-rss-box"></i> &nbsp;<span>แหล่งข่าว RSS (Feed Sources)</span></a>
+            </li>
+            <li class="<?= $currentPage == "bookmarks" ? 'active' : '' ?>">
+                <a href="<?= admin_url("bookmarks") ?>"><i class="mdi mdi-bookmark-check-outline"></i> &nbsp;<span>บุ๊กมาร์กข่าว (Bookmarks)</span></a>
             </li>
             <li class="<?= $currentPage == "broadcast" ? 'active' : '' ?>">
                 <a href="<?= admin_url("broadcast") ?>"><i class="mdi mdi-bullhorn"></i> &nbsp;<span>ประกาศ & ข่าวด่วน (Broadcast)</span></a>

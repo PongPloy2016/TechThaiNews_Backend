@@ -189,7 +189,47 @@
             background: #f1f5f9 !important;
         }
 
-        /* 🖤 Ultra-Premium Dark Sidebar */
+        /* 🖤 Ultra-Premium Dark Sidebar with Optimized 265px Width */
+        @media (min-width: 768px) {
+            .main-sidebar, .left-side {
+                width: 265px !important;
+            }
+            .main-header .logo {
+                width: 265px !important;
+            }
+            .main-header .navbar {
+                margin-left: 265px !important;
+            }
+            .content-wrapper, .right-side, .main-footer {
+                margin-left: 265px !important;
+            }
+        }
+        @media (max-width: 767px) {
+            .main-sidebar, .left-side {
+                width: 265px !important;
+                -webkit-transform: translate(-265px, 0) !important;
+                -ms-transform: translate(-265px, 0) !important;
+                transform: translate(-265px, 0) !important;
+            }
+            .sidebar-open .main-sidebar, .sidebar-open .left-side {
+                -webkit-transform: translate(0, 0) !important;
+                -ms-transform: translate(0, 0) !important;
+                transform: translate(0, 0) !important;
+            }
+        }
+        .sidebar-collapse .main-sidebar, .sidebar-collapse .left-side {
+            width: 50px !important;
+        }
+        .sidebar-collapse .content-wrapper, .sidebar-collapse .right-side, .sidebar-collapse .main-footer {
+            margin-left: 50px !important;
+        }
+        .sidebar-collapse .main-header .navbar {
+            margin-left: 50px !important;
+        }
+        .sidebar-collapse .main-header .logo {
+            width: 50px !important;
+        }
+
         .main-sidebar, .left-side {
             background: linear-gradient(180deg, #0b0f19 0%, #0f172a 60%, #090d16 100%) !important;
             border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
@@ -206,19 +246,24 @@
         }
         .sidebar-menu > li > a {
             color: #94a3b8 !important;
-            padding: 12px 20px !important;
+            padding: 12px 18px !important;
             font-size: 13.5px !important;
             font-weight: 500 !important;
             border-left: 3px solid transparent !important;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
             display: flex !important;
             align-items: center !important;
+            white-space: nowrap !important;
+        }
+        .sidebar-menu > li > a span {
+            white-space: nowrap !important;
         }
         .sidebar-menu > li > a i {
             font-size: 18px !important;
             color: #64748b !important;
             transition: color 0.2s ease !important;
             margin-right: 10px !important;
+            flex-shrink: 0 !important;
         }
         .sidebar-menu > li:hover > a {
             color: #ffffff !important;
@@ -244,7 +289,7 @@
         }
         .sidebar-menu .treeview .pull-right-container {
             position: absolute;
-            right: 16px;
+            right: 14px;
             top: 50%;
             transform: translateY(-50%);
             transition: transform 0.25s ease;
@@ -262,7 +307,7 @@
         }
         .sidebar-menu .treeview-menu > li > a {
             color: #94a3b8 !important;
-            padding: 9px 16px 9px 14px !important;
+            padding: 9px 14px 9px 12px !important;
             font-size: 13px !important;
             font-weight: 500 !important;
             display: flex !important;
@@ -271,7 +316,11 @@
             border-left: 2px solid transparent !important;
             transition: all 0.2s ease !important;
             border-radius: 0 8px 8px 0 !important;
-            margin: 2px 8px 2px 0 !important;
+            margin: 2px 6px 2px 0 !important;
+            white-space: nowrap !important;
+        }
+        .sidebar-menu .treeview-menu > li > a span {
+            white-space: nowrap !important;
         }
         .sidebar-menu .treeview-menu > li > a i {
             font-size: 16px !important;
