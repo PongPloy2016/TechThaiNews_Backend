@@ -199,6 +199,46 @@ input:checked + .fg-slider:before {
     display: inline-flex;
     align-items: center;
     gap: 5px;
+.fg-banner-actions {
+    text-align: right;
+}
+@media (max-width: 991px) {
+    .fg-banner-actions {
+        text-align: left !important;
+        margin-top: 18px !important;
+    }
+    .fg-banner-actions .btn-success {
+        width: 100% !important;
+    }
+    .fg-banner-actions .fg-quick-links {
+        justify-content: flex-start !important;
+        flex-wrap: wrap !important;
+    }
+}
+
+@media (max-width: 767px) {
+    .fg-hero-banner {
+        padding: 20px 16px !important;
+        border-radius: 16px !important;
+    }
+    .fg-hero-banner h2 {
+        font-size: 19px !important;
+        line-height: 1.35 !important;
+    }
+    .fg-hero-banner p {
+        font-size: 13px !important;
+    }
+    .fg-stats-row {
+        gap: 8px !important;
+    }
+    .fg-stat-chip {
+        font-size: 12px !important;
+        padding: 6px 12px !important;
+    }
+    .fg-card {
+        padding: 16px 14px !important;
+        border-radius: 14px !important;
+    }
 }
 </style>
 
@@ -222,8 +262,8 @@ input:checked + .fg-slider:before {
 
         <!-- 🚀 Hero Banner -->
         <div class="fg-hero-banner">
-            <div class="row align-items-center" style="display: flex; align-items: center; flex-wrap: wrap;">
-                <div class="col-md-8">
+            <div class="row align-items-center">
+                <div class="col-md-8 col-sm-12 col-xs-12">
                     <h2>📁 จัดการหมวดหมู่ข่าวสาร (Feed Groups Hub)</h2>
                     <p>
                         เชื่อมต่อตาราง <code>public.feed_groups</code> ใน Supabase — สามารถคลิกสวิตช์ <strong>เปิด / ปิด (Enable/Disable)</strong> หมวดหมู่ข่าวแบบเรียลไทม์ได้ทันที โดยหมวดที่ปิดใช้งานจะไม่แสดงในเมนูหน้าแรกของแอปพลิเคชัน
@@ -240,11 +280,11 @@ input:checked + .fg-slider:before {
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4 text-right hidden-xs" style="text-align: right;">
+                <div class="col-md-4 col-sm-12 col-xs-12 fg-banner-actions">
                     <button type="button" class="btn btn-success btn-lg" data-toggle="modal" data-target="#modalAddGroup" style="border-radius: 14px; font-weight: 800; padding: 12px 24px; box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);">
                         <i class="fa fa-plus-circle"></i> เพิ่มหมวดหมู่ใหม่
                     </button>
-                    <div style="margin-top: 10px; display: flex; gap: 12px; justify-content: flex-end;">
+                    <div class="fg-quick-links" style="margin-top: 10px; display: flex; gap: 12px; justify-content: flex-end;">
                         <a href="<?= admin_url("feed_sources") ?>" class="btn btn-link" style="color: #94a3b8; font-size: 12px; text-decoration: none;">
                             <i class="mdi mdi-rss-box"></i> ไปยังหน้า แหล่งข่าว (Feed Sources) &rarr;
                         </a>

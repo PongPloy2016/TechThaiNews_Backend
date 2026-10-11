@@ -216,18 +216,77 @@
                 -ms-transform: translate(0, 0) !important;
                 transform: translate(0, 0) !important;
             }
+            .content-wrapper, .right-side, .main-footer,
+            .sidebar-collapse .content-wrapper, .sidebar-collapse .right-side, .sidebar-collapse .main-footer {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+            .main-header .navbar,
+            .sidebar-collapse .main-header .navbar {
+                margin-left: 0 !important;
+            }
+            .content {
+                padding: 14px 12px !important;
+            }
         }
-        .sidebar-collapse .main-sidebar, .sidebar-collapse .left-side {
-            width: 50px !important;
+        @media (min-width: 768px) {
+            .sidebar-collapse .main-sidebar, .sidebar-collapse .left-side {
+                width: 50px !important;
+            }
+            .sidebar-collapse .content-wrapper, .sidebar-collapse .right-side, .sidebar-collapse .main-footer {
+                margin-left: 50px !important;
+            }
+            .sidebar-collapse .main-header .navbar {
+                margin-left: 50px !important;
+            }
+            .sidebar-collapse .main-header .logo {
+                width: 50px !important;
+            }
         }
-        .sidebar-collapse .content-wrapper, .sidebar-collapse .right-side, .sidebar-collapse .main-footer {
-            margin-left: 50px !important;
-        }
-        .sidebar-collapse .main-header .navbar {
-            margin-left: 50px !important;
-        }
-        .sidebar-collapse .main-header .logo {
-            width: 50px !important;
+
+        /* 📱 Responsive Mobile Hero Banners & Controls across Admin-V3 */
+        @media (max-width: 991px) {
+            .fg-hero-banner, .fs-hero-banner, .bm-hero-banner, 
+            .bc-hero-banner, .fb-hero-banner, .cm-hero-banner, 
+            .ts-hero-banner, .newsroom-hero {
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                padding: 20px 16px !important;
+                border-radius: 16px !important;
+                margin-bottom: 18px !important;
+            }
+            .fg-hero-banner .row, .fs-hero-banner .row, .bm-hero-banner .row, 
+            .bc-hero-banner .row, .fb-hero-banner .row, .cm-hero-banner .row, 
+            .ts-hero-banner .row, .newsroom-hero .row {
+                display: flex !important;
+                flex-direction: column !important;
+                width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            .fg-hero-banner [class*="col-"], .fs-hero-banner [class*="col-"], 
+            .bm-hero-banner [class*="col-"], .bc-hero-banner [class*="col-"], 
+            .fb-hero-banner [class*="col-"], .cm-hero-banner [class*="col-"], 
+            .ts-hero-banner [class*="col-"], .newsroom-hero [class*="col-"] {
+                width: 100% !important;
+                max-width: 100% !important;
+                flex: 1 1 100% !important;
+                padding-left: 0 !important;
+                padding-right: 0 !important;
+            }
+            .fg-stats-row, .fs-stats-row, .bm-stats-row, 
+            .bc-stats-row, .fb-stats-row, .cm-stats-row, .ts-stats-row {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                gap: 8px !important;
+                width: 100% !important;
+            }
+            .fg-stat-chip, .fs-stat-chip, .bm-stat-chip, 
+            .bc-stat-chip, .fb-stat-chip, .cm-stat-chip, .ts-stat-chip {
+                font-size: 12px !important;
+                padding: 6px 12px !important;
+            }
         }
 
         .main-sidebar, .left-side {
