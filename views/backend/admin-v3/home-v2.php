@@ -509,7 +509,7 @@ $selectedGroup = $selected_news_group ?? 'tech-business';
                                 <?php
                                 $thumb = !empty($art['image']) ? $art['image'] : 'views/backend/admin-v3/assets/images/def_logo.png';
                                 $sourceName = !empty($art['source_label']) ? $art['source_label'] : (!empty($art['source_key']) ? ucfirst($art['source_key']) : 'สำนักข่าว');
-                                $timeAgo = !empty($art['time_ago']) ? $art['time_ago'] : date("d M H:i", $art['pub_date'] ?? time());
+                                $timeAgo = !empty($art['time_ago']) ? $art['time_ago'] : (class_exists('RssFeedService') ? RssFeedService::formatThaiDateTime($art['pub_date'] ?? time()) : date("d M H:i", $art['pub_date'] ?? time()));
                                 ?>
                                 <div class="article-row">
                                     <img src="<?= htmlspecialchars($thumb) ?>" 

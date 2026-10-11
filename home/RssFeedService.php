@@ -38,7 +38,7 @@ class RssFeedService {
             $content = @file_get_contents($cacheFile);
             $cached = $content ? json_decode($content, true) : null;
             if (is_array($cached) && !empty($cached)) {
-                return $cached;
+                return self::normalizeArticles($cached);
             }
         }
 
@@ -82,7 +82,7 @@ class RssFeedService {
             $content = @file_get_contents($cacheFile);
             $cached = $content ? json_decode($content, true) : null;
             if (is_array($cached) && !empty($cached)) {
-                return $cached;
+                return self::normalizeArticles($cached);
             }
         }
 
@@ -101,7 +101,7 @@ class RssFeedService {
             @file_put_contents($cacheFile, json_encode($articles, JSON_UNESCAPED_UNICODE));
         }
 
-        return $articles;
+        return self::normalizeArticles($articles);
     }
 
     /**
@@ -124,7 +124,7 @@ class RssFeedService {
             $content = @file_get_contents($cacheFile);
             $cached = $content ? json_decode($content, true) : null;
             if (is_array($cached) && !empty($cached)) {
-                return $cached;
+                return self::normalizeArticles($cached);
             }
         }
 
@@ -172,7 +172,7 @@ class RssFeedService {
             @file_put_contents($cacheFile, json_encode($allArticles, JSON_UNESCAPED_UNICODE));
         }
 
-        return $allArticles;
+        return self::normalizeArticles($allArticles);
     }
 
     /**
@@ -595,11 +595,14 @@ class RssFeedService {
             'author'       => $author,
             'source_key'   => $source['key'],
             'source_label' => $source['label'],
-            'group_key'    => $groupKey,
-            'pub_date'     => $timestamp,
-            'time_ago'     => self::timeAgo($timestamp),
-            'reading_time' => self::calcReadingTime($rawClean ?: $cleanDesc),
-            'is_new'       => (time() - $timestamp) < 86400
+            'group_key'         => $groupKey,
+            'pub_date'          => $timestamp,
+            'pub_date_thai'     => self::formatThaiDate($timestamp),
+            'pub_time_thai'     => self::formatThaiTime($timestamp),
+            'pub_datetime_thai' => self::formatThaiDateTime($timestamp),
+            'time_ago'          => self::timeAgo($timestamp),
+            'reading_time'      => self::calcReadingTime($rawClean ?: $cleanDesc),
+            'is_new'            => (time() - $timestamp) < 86400
         ];
     }
 
@@ -659,11 +662,14 @@ class RssFeedService {
             'author'       => $author,
             'source_key'   => $source['key'],
             'source_label' => $source['label'],
-            'group_key'    => $groupKey,
-            'pub_date'     => $timestamp,
-            'time_ago'     => self::timeAgo($timestamp),
-            'reading_time' => self::calcReadingTime($rawClean ?: $cleanDesc),
-            'is_new'       => (time() - $timestamp) < 86400
+            'group_key'         => $groupKey,
+            'pub_date'          => $timestamp,
+            'pub_date_thai'     => self::formatThaiDate($timestamp),
+            'pub_time_thai'     => self::formatThaiTime($timestamp),
+            'pub_datetime_thai' => self::formatThaiDateTime($timestamp),
+            'time_ago'          => self::timeAgo($timestamp),
+            'reading_time'      => self::calcReadingTime($rawClean ?: $cleanDesc),
+            'is_new'            => (time() - $timestamp) < 86400
         ];
     }
 
@@ -716,27 +722,82 @@ class RssFeedService {
     }
 
     /**
-     * Relative time in Thai language
+     * Thai abbreviated months lookup table
+     */
+    private static $thaiMonthsShort = [
+        1 => 'ม.ค.', 2 => 'ก.พ.', 3 => 'มี.ค.', 4 => 'เม.ย.', 5 => 'พ.ค.', 6 => 'มิ.ย.',
+        7 => 'ก.ค.', 8 => 'ส.ค.', 9 => 'ก.ย.', 10 => 'ต.ค.', 11 => 'พ.ย.', 12 => 'ธ.ค.'
+    ];
+
+    /**
+     * Normalize articles loaded from feed or cache
+     * Ensures consistent Thai Buddhist Era date & time format
+     */
+    public static function normalizeArticles($articles) {
+        if (!is_array($articles)) return [];
+        foreach ($articles as &$art) {
+            $ts = !empty($art['pub_date']) && is_numeric($art['pub_date']) ? (int)$art['pub_date'] : time();
+            $art['time_ago']          = self::formatThaiDateTime($ts, true);
+            $art['pub_date_thai']     = self::formatThaiDate($ts);
+            $art['pub_time_thai']     = self::formatThaiTime($ts);
+            $art['pub_datetime_thai'] = $art['time_ago'];
+        }
+        unset($art);
+        return $articles;
+    }
+
+    /**
+     * Format timestamp as Thai Buddhist Era date & time
+     * Displays as: "วันที่ 11 ต.ค. 69 เวลา 12:58"
+     *
+     * @param int|string $timestamp
+     * @param bool $includeTime
+     * @return string
+     */
+    public static function formatThaiDateTime($timestamp, $includeTime = true) {
+        if (date_default_timezone_get() !== 'Asia/Bangkok') {
+            @date_default_timezone_set('Asia/Bangkok');
+        }
+        $ts = !empty($timestamp) && is_numeric($timestamp) ? (int)$timestamp : time();
+        $d = (int)date('j', $ts);
+        $m = (int)date('n', $ts);
+        $monthStr = self::$thaiMonthsShort[$m] ?? '';
+        $beYearShort = sprintf('%02d', ((int)date('Y', $ts) + 543) % 100);
+        $dateStr = "วันที่ {$d} {$monthStr} {$beYearShort}";
+
+        if ($includeTime) {
+            $timeStr = date('H:i', $ts);
+            return "{$dateStr} เวลา {$timeStr}";
+        }
+        return $dateStr;
+    }
+
+    /**
+     * Format timestamp as Thai Buddhist Era date only
+     * Example: "วันที่ 11 ต.ค. 69"
+     */
+    public static function formatThaiDate($timestamp) {
+        return self::formatThaiDateTime($timestamp, false);
+    }
+
+    /**
+     * Format timestamp as Thai time only
+     * Example: "เวลา 12:58"
+     */
+    public static function formatThaiTime($timestamp) {
+        if (date_default_timezone_get() !== 'Asia/Bangkok') {
+            @date_default_timezone_set('Asia/Bangkok');
+        }
+        $ts = !empty($timestamp) && is_numeric($timestamp) ? (int)$timestamp : time();
+        return 'เวลา ' . date('H:i', $ts);
+    }
+
+    /**
+     * Relative time or Thai Date Time display
+     * Formats strictly as requested: "วันที่ 11 ต.ค. 69 เวลา 12:58"
      */
     public static function timeAgo($timestamp) {
-        $diff = time() - $timestamp;
-
-        if ($diff < 60) {
-            return 'เมื่อสักครู่';
-        } elseif ($diff < 3600) {
-            $mins = max(1, floor($diff / 60));
-            return $mins . ' นาทีที่แล้ว';
-        } elseif ($diff < 86400) {
-            $hrs = floor($diff / 3600);
-            return $hrs . ' ชั่วโมงที่แล้ว';
-        } elseif ($diff < 172800) {
-            return 'เมื่อวานนี้';
-        } elseif ($diff < 604800) {
-            $days = floor($diff / 86400);
-            return $days . ' วันที่แล้ว';
-        } else {
-            return date('d/m/Y', $timestamp);
-        }
+        return self::formatThaiDateTime($timestamp, true);
     }
 
     /**

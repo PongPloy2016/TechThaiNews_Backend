@@ -4,6 +4,11 @@
  * Supabase Connection & News Feed Constants
  */
 
+// Set default timezone to Thailand (GMT+7)
+if (date_default_timezone_get() !== 'Asia/Bangkok') {
+    @date_default_timezone_set('Asia/Bangkok');
+}
+
 if (file_exists(__DIR__ . '/config.local.php')) {
     require_once __DIR__ . '/config.local.php';
 }

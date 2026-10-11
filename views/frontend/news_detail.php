@@ -19,11 +19,12 @@ $thaiMonths = [
     7 => 'ก.ค.', 8 => 'ส.ค.', 9 => 'ก.ย.', 10 => 'ต.ค.', 11 => 'พ.ย.', 12 => 'ธ.ค.'
 ];
 $pubTime = $article ? ($article['pub_date'] ?? time()) : time();
-$dayNum = date('j', $pubTime);
+$dayNum = (int)date('j', $pubTime);
 $monthNum = (int)date('n', $pubTime);
-$yearTh = (int)date('Y', $pubTime) + 543;
+$yearShort = ((int)date('Y', $pubTime) + 543) % 100;
+$yearShortStr = sprintf('%02d', $yearShort);
 $timeStr = date('H:i', $pubTime);
-$fullThaiDate = $dayNum . ' ' . ($thaiMonths[$monthNum] ?? '') . ' ' . $yearTh . ' เวลา ' . $timeStr . ' น.';
+$fullThaiDate = 'วันที่ ' . $dayNum . ' ' . ($thaiMonths[$monthNum] ?? '') . ' ' . $yearShortStr . ' เวลา ' . $timeStr;
 
 // Editorial color palette
 $badgeColors = [
@@ -393,8 +394,6 @@ $currentUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" 
                                     </div>
                                     <div class="text-muted small d-flex align-items-center gap-1" style="font-size: 0.78rem;">
                                         <span><?php echo htmlspecialchars($fullThaiDate); ?></span>
-                                        <span>&bull;</span>
-                                        <span class="text-primary fw-medium"><?php echo htmlspecialchars($article['time_ago']); ?></span>
                                         <span>&bull;</span>
                                         <span><?php echo htmlspecialchars($article['reading_time'] ?? 'อ่าน 2 นาที'); ?></span>
                                     </div>
